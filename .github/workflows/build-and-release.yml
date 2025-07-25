@@ -8,6 +8,8 @@ on:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - uses: actions/checkout@v4
@@ -29,17 +31,14 @@ jobs:
         cp package.json dist/
         cp README.md dist/
         cp DEPLOYMENT.md dist/
+        cd dist && zip -r ../nxtclone-${{ github.ref_name }}.zip .
     
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref }}
-        release_name: NxtClone ${{ github.ref }}
+        name: NxtClone ${{ github.ref_name }}
         body: |
-          ## NxtClone Release ${{ github.ref }}
+          ## NxtClone Release ${{ github.ref_name }}
           
           ### Features
           - Remote monitoring and management
@@ -57,15 +56,7 @@ jobs:
           
           ### Auto-Update
           Agents will automatically check for and install updates from this release.
+        files: |
+          nxtclone-${{ github.ref_name }}.zip
         draft: false
         prerelease: false
-    
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist
-        asset_name: nxtclone-${{ github.ref_name }}.zip
-        asset_content_type: application/zip
