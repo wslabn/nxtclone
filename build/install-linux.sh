@@ -1,21 +1,33 @@
 #!/bin/bash
 
-# NxtClone Agent Linux Installer
+# NxtClone Linux Agent Installer
+# Usage: sudo ./install-linux.sh [server_url]
+# Example: sudo ./install-linux.sh ws://192.168.1.100:3000
 
-INSTALL_DIR="/opt/nxtclone"
-SERVICE_FILE="/etc/systemd/system/nxtclone-agent.service"
+set -e
+
+# Get server URL from parameter or use default
+SERVER_URL="${1:-ws://localhost:3000}"
 
 echo "Installing NxtClone Agent..."
+echo "Server URL: $SERVER_URL"
 
-# Create install directory
-sudo mkdir -p $INSTALL_DIR
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo "Please run as root (use sudo)"
+    echo "Usage: sudo ./install-linux.sh [server_url]"
+    exit 1
+fi
 
-# Copy executable
-sudo cp dist/nxtclone-agent $INSTALL_DIR/
-sudo chmod +x $INSTALL_DIR/nxtclone-agent
+# Create installation directory
+mkdir -p /opt/nxtclone
 
-# Create systemd service
-sudo tee $SERVICE_FILE > /dev/null <<EOF
+# Copy agent executable
+cp nxtclone-agent-linux /opt/nxtclone/nxtclone-agent
+chmod +x /opt/nxtclone/nxtclone-agent
+
+# Create systemd service file
+cat > /etc/systemd/system/nxtclone-agent.service << EOF
 [Unit]
 Description=NxtClone Agent
 After=network.target
@@ -23,7 +35,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=$INSTALL_DIR/nxtclone-agent
+WorkingDirectory=/opt/nxtclone
+ExecStart=/opt/nxtclone/nxtclone-agent $SERVER_URL
 Restart=always
 RestartSec=10
 
@@ -31,11 +44,15 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-# Enable and start service
-sudo systemctl daemon-reload
-sudo systemctl enable nxtclone-agent
-sudo systemctl start nxtclone-agent
+# Reload systemd and enable service
+systemctl daemon-reload
+systemctl enable nxtclone-agent
+systemctl start nxtclone-agent
 
-echo "NxtClone Agent installed and started successfully!"
-echo "Status: sudo systemctl status nxtclone-agent"
-echo "Logs: sudo journalctl -u nxtclone-agent -f"
+echo "NxtClone Agent installed successfully!"
+echo "Service status:"
+systemctl status nxtclone-agent --no-pager -l
+
+echo ""
+echo "To check logs: sudo journalctl -u nxtclone-agent -f"
+echo "To restart: sudo systemctl restart nxtclone-agent"

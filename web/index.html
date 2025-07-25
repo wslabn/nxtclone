@@ -69,6 +69,12 @@
         .summary-card { background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .summary-number { font-size: 24px; font-weight: bold; }
         .summary-label { font-size: 12px; color: #666; margin-top: 5px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 800px; max-height: 80%; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-close { font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; }
+        .modal-close:hover { color: #000; }
+        .modal-output { background: #f5f5f5; padding: 15px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -82,6 +88,17 @@
         <div class="summary" id="summary"></div>
     </div>
     <div id="machines"></div>
+    
+    <!-- Modal for command output -->
+    <div id="commandModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Command Output</h3>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalOutput" class="modal-output">Loading...</div>
+        </div>
+    </div>
 
     <script>
         let machines = [];
@@ -100,6 +117,21 @@
             renderSummary();
             
             const container = document.getElementById('machines');
+            
+            // Store current input values and result visibility
+            const inputValues = {};
+            const resultStates = {};
+            
+            machines.forEach(machine => {
+                const input = document.getElementById(`cmd-${machine.id}`);
+                const result = document.getElementById(`result-${machine.id}`);
+                if (input) inputValues[machine.id] = input.value;
+                if (result) resultStates[machine.id] = {
+                    display: result.style.display,
+                    content: result.textContent
+                };
+            });
+            
             container.innerHTML = '';
 
             if (machines.length === 0) {
@@ -125,6 +157,25 @@
                     ${renderSystemInfo(machine)}
                     ${machine.status === 'online' ? renderMetrics(machine) : ''}
                     
+                    <div class="quick-actions" style="margin: 15px 0;">
+                        <h4>Quick Actions:</h4>
+                        <button onclick="quickAction('${machine.id}', 'shutdown')" 
+                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                style="background: #f44336; margin-right: 5px;">Shutdown</button>
+                        <button onclick="quickAction('${machine.id}', 'reboot')" 
+                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                style="background: #ff9800; margin-right: 5px;">Reboot</button>
+                        <button onclick="quickAction('${machine.id}', 'processes')" 
+                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                style="background: #2196f3; margin-right: 5px;">Processes</button>
+                        <button onclick="quickAction('${machine.id}', 'services')" 
+                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                style="background: #4caf50; margin-right: 5px;">Services</button>
+                        <button onclick="quickAction('${machine.id}', 'network')" 
+                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                style="background: #9c27b0; margin-right: 5px;">Network</button>
+                    </div>
+                    
                     <div class="command-section">
                         <input type="text" id="cmd-${machine.id}" placeholder="Enter command..." 
                                ${machine.status === 'offline' ? 'disabled' : ''}>
@@ -135,6 +186,19 @@
                 `;
                 
                 container.appendChild(div);
+                
+                // Restore input values and result states
+                const input = document.getElementById(`cmd-${machine.id}`);
+                const result = document.getElementById(`result-${machine.id}`);
+                
+                if (input && inputValues[machine.id]) {
+                    input.value = inputValues[machine.id];
+                }
+                
+                if (result && resultStates[machine.id]) {
+                    result.style.display = resultStates[machine.id].display;
+                    result.textContent = resultStates[machine.id].content;
+                }
             });
         }
         
@@ -315,8 +379,110 @@
             }
         }
 
-        // Auto-refresh every 5 seconds
-        setInterval(loadMachines, 5000);
+        function quickAction(machineId, action) {
+            const commands = {
+                'shutdown': {
+                    'Windows': 'shutdown /s /t 30 /c "Remote shutdown in 30 seconds"',
+                    'Linux': 'sudo shutdown -h +1 "Remote shutdown in 1 minute"'
+                },
+                'reboot': {
+                    'Windows': 'shutdown /r /t 30 /c "Remote reboot in 30 seconds"',
+                    'Linux': 'sudo reboot'
+                },
+                'processes': {
+                    'Windows': 'tasklist /fo table',
+                    'Linux': 'ps aux --sort=-%cpu | head -20'
+                },
+                'services': {
+                    'Windows': 'sc query state= all',
+                    'Linux': 'systemctl list-units --type=service --state=running'
+                },
+                'network': {
+                    'Windows': 'ipconfig /all && netstat -an | findstr LISTEN',
+                    'Linux': 'ip addr show && ss -tuln'
+                }
+            };
+            
+            const machine = machines.find(m => m.id === machineId);
+            if (!machine) return;
+            
+            const platform = machine.platform.includes('Windows') ? 'Windows' : 'Linux';
+            const command = commands[action][platform];
+            
+            if (action === 'shutdown' || action === 'reboot') {
+                if (!confirm(`Are you sure you want to ${action} ${machine.hostname}?`)) {
+                    return;
+                }
+                executeCommandDirect(machineId, command, false);
+            } else {
+                // Show informational commands in modal
+                executeCommandDirect(machineId, command, true);
+            }
+        }
+        
+        async function executeCommandDirect(machineId, command, showInModal = false) {
+            const machine = machines.find(m => m.id === machineId);
+            const resultDiv = document.getElementById(`result-${machineId}`);
+            
+            if (showInModal) {
+                document.getElementById('modalTitle').textContent = `${machine.hostname} - ${command}`;
+                document.getElementById('modalOutput').textContent = 'Executing command...';
+                document.getElementById('commandModal').style.display = 'block';
+            }
+            
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId, command })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (showInModal) {
+                        // Wait a moment for command to execute, then fetch results
+                        setTimeout(() => {
+                            document.getElementById('modalOutput').textContent = 'Command sent successfully. Check server console for results.';
+                        }, 1000);
+                    } else {
+                        resultDiv.textContent = `Command sent: ${command}`;
+                        resultDiv.style.display = 'block';
+                    }
+                } else {
+                    const errorMsg = `Error: ${result.error}`;
+                    if (showInModal) {
+                        document.getElementById('modalOutput').textContent = errorMsg;
+                    } else {
+                        resultDiv.textContent = errorMsg;
+                        resultDiv.style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                const errorMsg = `Error: ${error.message}`;
+                if (showInModal) {
+                    document.getElementById('modalOutput').textContent = errorMsg;
+                } else {
+                    resultDiv.textContent = errorMsg;
+                    resultDiv.style.display = 'block';
+                }
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('commandModal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('commandModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Auto-refresh every 10 seconds (slower to reduce interference)
+        setInterval(loadMachines, 10000);
         
         // Initial load
         loadMachines();
