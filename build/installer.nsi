@@ -69,6 +69,10 @@ Section "install"
     # Copy the agent executable
     File "dist\nxtclone-agent.exe"
     
+    # Verify file was copied
+    IfFileExists "$INSTDIR\nxtclone-agent.exe" +2 0
+    MessageBox MB_OK "Error: Agent executable not found after copy!"
+    
     # Stop existing service if running
     ExecWait 'sc stop "${APPNAME}"'
     ExecWait 'sc delete "${APPNAME}"'
@@ -76,8 +80,8 @@ Section "install"
     # Create the service with the provided server URL
     ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\nxtclone-agent.exe\" $ServerUrl" start= auto'
     
-    # Start the service
-    ExecWait 'sc start "${APPNAME}"'
+    # Don't start service automatically - let user start it manually
+    # ExecWait 'sc start "${APPNAME}"'
     
     # Create uninstaller
     WriteUninstaller "$INSTDIR\uninstall.exe"

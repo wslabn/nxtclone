@@ -14,7 +14,7 @@ def build_windows_agent():
         f'--add-data=../agents/agent_updater.py{separator}.',
         f'--add-data=../agents/windows_agent.py{separator}.',
         '--hidden-import=win32timezone',
-        '../agents/windows_service.py'
+        '../agents/windows_agent.py'
     ])
     
     print("Windows agent built successfully!")
