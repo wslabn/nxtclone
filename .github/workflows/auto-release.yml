@@ -34,9 +34,49 @@ jobs:
           echo "No version change detected"
         fi
 
-  auto-release:
+  build-executables:
     needs: check-version
     if: needs.check-version.outputs.version-changed == 'true'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Build Windows executable
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd build
+        pip install -r requirements-build.txt
+        python build-windows.py
+        mkdir -p ../releases
+        copy dist\nxtclone-agent.exe ..\releases\nxtclone-agent-windows.exe
+    
+    - name: Build Linux executable
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd build
+        pip install -r requirements-build.txt
+        python build-linux.py
+        mkdir -p ../releases
+        cp dist/nxtclone-agent ../releases/nxtclone-agent-linux
+        cp install-linux.sh ../releases/
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: executables-${{ matrix.os }}
+        path: releases/
+
+  auto-release:
+    needs: [check-version, build-executables]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -49,15 +89,10 @@ jobs:
       with:
         node-version: '18'
     
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Install dependencies and build
+    - name: Install dependencies and build source
       run: |
         npm install
-        mkdir -p dist releases
+        mkdir -p dist
         cp -r server dist/
         cp -r agents dist/
         cp -r web dist/
@@ -67,15 +102,15 @@ jobs:
         cp DEPLOYMENT.md dist/
         cd dist && zip -r ../nxtclone-v${{ needs.check-version.outputs.new-version }}.zip .
     
-    - name: Build executables
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: releases/
+    
+    - name: Organize artifacts
       run: |
-        cd build
-        pip install -r requirements-build.txt
-        python build-windows.py
-        python build-linux.py
-        cp dist/nxtclone-agent.exe ../releases/nxtclone-agent-windows.exe
-        cp dist/nxtclone-agent ../releases/nxtclone-agent-linux
-        cp install-linux.sh ../releases/
+        mkdir -p final-releases
+        find releases/ -name "*" -type f -exec cp {} final-releases/ \;
     
     - name: Create Git tag
       run: |
@@ -114,8 +149,6 @@ jobs:
           Agents will automatically update from this release.
         files: |
           nxtclone-v${{ needs.check-version.outputs.new-version }}.zip
-          releases/nxtclone-agent-windows.exe
-          releases/nxtclone-agent-linux
-          releases/install-linux.sh
+          final-releases/*
         draft: false
         prerelease: false
