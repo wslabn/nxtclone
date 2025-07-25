@@ -50,15 +50,22 @@ jobs:
       with:
         python-version: '3.9'
     
-    - name: Build Windows executable
+    - name: Build Windows installer
       if: matrix.os == 'windows-latest'
       run: |
+        # Install NSIS
+        choco install nsis -y
+        
         cd build
         pip install -r requirements-build.txt
         pip install pywin32==306
         python build-windows.py
+        
+        # Build NSIS installer
+        & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+        
         mkdir -p ../releases
-        copy dist\nxtclone-agent.exe ..\releases\nxtclone-agent-windows.exe
+        copy nxtclone-agent-installer.exe ..\releases\nxtclone-agent-installer.exe
     
     - name: Build Linux executable
       if: matrix.os == 'ubuntu-latest'
