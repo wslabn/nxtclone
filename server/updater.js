@@ -32,7 +32,24 @@ class Updater {
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
           try {
+            if (!data) {
+              reject(new Error('No data received from GitHub API'));
+              return;
+            }
+            
             const release = JSON.parse(data);
+            if (!release.tag_name) {
+              // No releases found, return current version as latest
+              resolve({
+                hasUpdate: false,
+                currentVersion: this.currentVersion,
+                latestVersion: this.currentVersion,
+                downloadUrl: null,
+                releaseNotes: 'No releases found'
+              });
+              return;
+            }
+            
             const latestVersion = release.tag_name.replace('v', '');
             
             const updateInfo = {

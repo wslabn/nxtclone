@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-group { margin: 15px 0; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px; }
+        button:hover { background: #005a87; }
+        .danger { background: #f44336; }
+        .danger:hover { background: #d32f2f; }
+        .success { color: #4caf50; }
+        .error { color: #f44336; }
+        .user-list { margin-top: 20px; }
+        .user-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #ddd; margin: 5px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Panel</h1>
+        <button onclick="window.location.href='/'" style="margin-bottom: 20px;">Back to Dashboard</button>
+        
+        <div class="card">
+            <h2>Change Password</h2>
+            <form id="changePasswordForm">
+                <div class="form-group">
+                    <label>Current Password:</label>
+                    <input type="password" id="currentPassword" required>
+                </div>
+                <div class="form-group">
+                    <label>New Password:</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password:</label>
+                    <input type="password" id="confirmPassword" required>
+                </div>
+                <button type="submit">Change Password</button>
+                <div id="passwordMessage"></div>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h2>Add User</h2>
+            <form id="addUserForm">
+                <div class="form-group">
+                    <label>Username:</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label>Password:</label>
+                    <input type="password" id="password" required>
+                </div>
+                <div class="form-group">
+                    <label>Role:</label>
+                    <select id="role">
+                        <option value="admin">Admin</option>
+                        <option value="user">User</option>
+                    </select>
+                </div>
+                <button type="submit">Add User</button>
+                <div id="userMessage"></div>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h2>Discord Alerts</h2>
+            <form id="discordForm">
+                <div class="form-group">
+                    <label>Discord Webhook URL:</label>
+                    <input type="url" id="webhookUrl" placeholder="https://discord.com/api/webhooks/...">
+                </div>
+                <button type="submit">Save Webhook</button>
+                <div id="discordMessage"></div>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h2>Users</h2>
+            <div id="usersList" class="user-list"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const current = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmPassword').value;
+            const message = document.getElementById('passwordMessage');
+            
+            if (newPass !== confirm) {
+                message.innerHTML = '<div class="error">Passwords do not match</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ currentPassword: current, newPassword: newPass })
+                });
+                
+                const result = await response.json();
+                message.innerHTML = result.success ? 
+                    '<div class="success">Password changed successfully</div>' :
+                    `<div class="error">${result.error}</div>`;
+                    
+                if (result.success) {
+                    document.getElementById('changePasswordForm').reset();
+                }
+            } catch (error) {
+                message.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        });
+        
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+            const message = document.getElementById('userMessage');
+            
+            try {
+                const response = await fetch('/api/add-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, role })
+                });
+                
+                const result = await response.json();
+                message.innerHTML = result.success ? 
+                    '<div class="success">User added successfully</div>' :
+                    `<div class="error">${result.error}</div>`;
+                    
+                if (result.success) {
+                    document.getElementById('addUserForm').reset();
+                    loadUsers();
+                }
+            } catch (error) {
+                message.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        });
+        
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                const container = document.getElementById('usersList');
+                
+                container.innerHTML = users.map(user => `
+                    <div class="user-item">
+                        <span><strong>${user.username}</strong> (${user.role})</span>
+                        <button class="danger" onclick="deleteUser('${user.username}')" 
+                                ${user.username === 'admin' ? 'disabled' : ''}>Delete</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load users:', error);
+            }
+        }
+        
+        async function deleteUser(username) {
+            if (!confirm(`Delete user ${username}?`)) return;
+            
+            try {
+                const response = await fetch('/api/delete-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    loadUsers();
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        
+        document.getElementById('discordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const webhookUrl = document.getElementById('webhookUrl').value;
+            const message = document.getElementById('discordMessage');
+            
+            try {
+                const response = await fetch('/api/discord-webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ webhookUrl })
+                });
+                
+                const result = await response.json();
+                message.innerHTML = result.success ? 
+                    '<div class="success">Discord webhook configured</div>' :
+                    `<div class="error">${result.error}</div>`;
+            } catch (error) {
+                message.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        });
+        
+        loadUsers();
+    </script>
+</body>
+</html>

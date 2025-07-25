@@ -175,8 +175,61 @@ class WindowsAgent:
         except Exception as e:
             return {"error": str(e)}
 
+def install_service(server_url):
+    """Install as Windows service"""
+    import subprocess
+    import sys
+    
+    service_name = "NxtClone Agent"
+    exe_path = sys.executable if sys.executable.endswith('.exe') else sys.argv[0]
+    
+    # Create service
+    cmd = f'sc create "{service_name}" binPath= "\"{exe_path}\" {server_url}" start= auto'
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        print(f"Service '{service_name}' installed successfully")
+        print(f"Server URL: {server_url}")
+        print("Starting service...")
+        subprocess.run(f'sc start "{service_name}"', shell=True)
+    else:
+        print(f"Failed to install service: {result.stderr}")
+
+def uninstall_service():
+    """Uninstall Windows service"""
+    import subprocess
+    
+    service_name = "NxtClone Agent"
+    
+    # Stop and delete service
+    subprocess.run(f'sc stop "{service_name}"', shell=True)
+    result = subprocess.run(f'sc delete "{service_name}"', shell=True, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        print(f"Service '{service_name}' uninstalled successfully")
+    else:
+        print(f"Failed to uninstall service: {result.stderr}")
+
 if __name__ == "__main__":
-    server_url = sys.argv[1] if len(sys.argv) > 1 else "ws://localhost:3000"
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "install":
+            server_url = sys.argv[2] if len(sys.argv) > 2 else "ws://localhost:3000"
+            install_service(server_url)
+            sys.exit(0)
+        elif sys.argv[1] == "uninstall":
+            uninstall_service()
+            sys.exit(0)
+        elif sys.argv[1].startswith("ws://"):
+            server_url = sys.argv[1]
+        else:
+            print("Usage:")
+            print("  nxtclone-agent.exe install [server_url]  - Install as service")
+            print("  nxtclone-agent.exe uninstall             - Remove service")
+            print("  nxtclone-agent.exe ws://server:port      - Run directly")
+            sys.exit(1)
+    else:
+        server_url = "ws://localhost:3000"
+    
     agent = WindowsAgent(server_url)
     
     print(f"Starting Windows Agent for {agent.hostname}")

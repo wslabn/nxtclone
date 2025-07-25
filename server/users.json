@@ -1,0 +1,7 @@
+{
+  "admin": {
+    "username": "admin",
+    "passwordHash": "357735d54ac3edc18c2e64165c1412d44b69e46cf2be2a9ea70fda4b619e2e7b",
+    "role": "admin"
+  }
+}
