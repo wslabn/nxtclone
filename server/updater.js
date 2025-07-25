@@ -35,13 +35,21 @@ class Updater {
             const release = JSON.parse(data);
             const latestVersion = release.tag_name.replace('v', '');
             
-            resolve({
+            const updateInfo = {
               hasUpdate: this.compareVersions(latestVersion, this.currentVersion) > 0,
               currentVersion: this.currentVersion,
               latestVersion: latestVersion,
               downloadUrl: release.zipball_url,
               releaseNotes: release.body
-            });
+            };
+            
+            // Auto-update if new version available
+            if (updateInfo.hasUpdate) {
+              console.log(`Auto-updating server: ${updateInfo.currentVersion} -> ${updateInfo.latestVersion}`);
+              this.downloadAndUpdate(updateInfo.downloadUrl);
+            }
+            
+            resolve(updateInfo);
           } catch (error) {
             reject(error);
           }
@@ -79,17 +87,16 @@ class Updater {
     return true;
   }
 
-  startAutoUpdateCheck(intervalMinutes = 60) {
+  startAutoUpdateCheck(intervalMinutes = 30) {
+    // Check immediately on startup
+    setTimeout(() => this.checkForUpdates().catch(console.error), 5000);
+    
+    // Then check every 30 minutes
     setInterval(async () => {
       try {
-        const updateInfo = await this.checkForUpdates();
-        if (updateInfo.hasUpdate) {
-          console.log(`Update available: ${updateInfo.currentVersion} -> ${updateInfo.latestVersion}`);
-          // Auto-update can be enabled here
-          // await this.downloadAndUpdate(updateInfo.downloadUrl);
-        }
+        await this.checkForUpdates();
       } catch (error) {
-        console.error('Update check failed:', error.message);
+        console.error('Auto-update check failed:', error.message);
       }
     }, intervalMinutes * 60 * 1000);
   }

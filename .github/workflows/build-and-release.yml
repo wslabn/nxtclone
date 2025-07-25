@@ -1,0 +1,71 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Create distribution package
+      run: |
+        mkdir -p dist
+        cp -r server dist/
+        cp -r agents dist/
+        cp -r web dist/
+        cp package.json dist/
+        cp README.md dist/
+        cp DEPLOYMENT.md dist/
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: NxtClone ${{ github.ref }}
+        body: |
+          ## NxtClone Release ${{ github.ref }}
+          
+          ### Features
+          - Remote monitoring and management
+          - Cross-platform agents (Windows, Linux)
+          - Real-time system metrics
+          - Auto-update functionality
+          - Web-based dashboard
+          
+          ### Installation
+          1. Download and extract the source code
+          2. Run `npm install` in the root directory
+          3. Start server with `npm start`
+          4. Install agent dependencies: `pip install -r agents/requirements.txt`
+          5. Run agents on target machines
+          
+          ### Auto-Update
+          Agents will automatically check for and install updates from this release.
+        draft: false
+        prerelease: false
+    
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist
+        asset_name: nxtclone-${{ github.ref_name }}.zip
+        asset_content_type: application/zip

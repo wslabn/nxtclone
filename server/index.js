@@ -172,8 +172,24 @@ class RMMServer {
   }
 
   startUpdateCheck() {
-    // Check for updates every hour
-    this.updater.startAutoUpdateCheck(60);
+    // Check for updates every 30 minutes and auto-notify agents
+    this.updater.startAutoUpdateCheck(30);
+    
+    // Listen for server updates to trigger agent updates
+    this.updater.onUpdateAvailable = () => {
+      this.notifyAllAgentsToUpdate();
+    };
+  }
+  
+  notifyAllAgentsToUpdate() {
+    console.log('Notifying all agents to update...');
+    const updateCommand = { type: 'update_request' };
+    
+    for (const client of this.clients.values()) {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(JSON.stringify(updateCommand));
+      }
+    }
   }
 
   start(port = 3000) {

@@ -19,6 +19,9 @@ class WindowsAgent:
         self.updater = AgentUpdater()
         
     async def connect(self):
+        # Start periodic update check
+        update_task = asyncio.create_task(self.periodic_update_check())
+        
         while True:
             try:
                 async with websockets.connect(self.server_url) as websocket:
@@ -43,6 +46,20 @@ class WindowsAgent:
                 print(f"Connection failed: {e}")
                 print("Retrying in 10 seconds...")
                 await asyncio.sleep(10)
+    
+    async def periodic_update_check(self):
+        """Check for updates every 2 hours and auto-update"""
+        while True:
+            try:
+                await asyncio.sleep(2 * 3600)  # 2 hours
+                update_info = self.updater.check_for_updates()
+                if update_info.get("has_update"):
+                    print(f"Auto-update available: {update_info['current_version']} -> {update_info['latest_version']}")
+                    if self.updater.download_and_update(update_info["download_url"]):
+                        print("Auto-update successful, restarting...")
+                        self.updater.restart_agent()
+            except Exception as e:
+                print(f"Periodic update check failed: {e}")
     
     async def register(self, websocket):
         system_info = self.get_system_info()
@@ -111,17 +128,18 @@ class WindowsAgent:
             await websocket.send(json.dumps(response))
             
         elif message["type"] == "update_request":
-            print("Update request received")
+            print("Auto-update request received")
             try:
                 update_info = self.updater.check_for_updates()
                 if update_info.get("has_update"):
-                    print(f"Update available: {update_info['current_version']} -> {update_info['latest_version']}")
+                    print(f"Auto-updating: {update_info['current_version']} -> {update_info['latest_version']}")
                     if self.updater.download_and_update(update_info["download_url"]):
+                        print("Update successful, restarting...")
                         self.updater.restart_agent()
                 else:
-                    print("No updates available")
+                    print("Agent is already up to date")
             except Exception as e:
-                print(f"Update check failed: {e}")
+                print(f"Auto-update failed: {e}")
     
     def get_system_info(self):
         """Get static system information"""
@@ -163,5 +181,6 @@ if __name__ == "__main__":
     
     print(f"Starting Windows Agent for {agent.hostname}")
     print(f"Connecting to: {server_url}")
+    print("Auto-update enabled - agent will update automatically")
     
     asyncio.run(agent.connect())
