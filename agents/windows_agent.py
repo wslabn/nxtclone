@@ -17,6 +17,7 @@ class WindowsAgent:
         self.hostname = socket.gethostname()
         self.platform = f"{platform.system()} {platform.release()}"
         self.updater = AgentUpdater()
+        self.check_and_migrate()
         
     async def connect(self):
         # Start periodic update check
@@ -140,6 +141,43 @@ class WindowsAgent:
                     print("Agent is already up to date")
             except Exception as e:
                 print(f"Auto-update failed: {e}")
+    
+    def check_and_migrate(self):
+        """Check if we need to migrate from old installation"""
+        try:
+            import subprocess
+            
+            # Check if old service exists
+            result = subprocess.run(['sc', 'query', 'NxtClone Agent'], 
+                                  capture_output=True, text=True)
+            
+            # Only migrate if old service exists AND points to x86 folder
+            if result.returncode == 0 and 'Program Files (x86)' in result.stdout:
+                print("Migrating from old installation...")
+                
+                # Stop old service
+                subprocess.run(['sc', 'stop', 'NxtClone Agent'], capture_output=True)
+                
+                # Delete old service
+                subprocess.run(['sc', 'delete', 'NxtClone Agent'], capture_output=True)
+                
+                # Clean up old folder
+                old_path = r"C:\Program Files (x86)\NxtClone"
+                if os.path.exists(old_path):
+                    import shutil
+                    try:
+                        shutil.rmtree(old_path)
+                        print("Removed old installation folder")
+                    except:
+                        print("Could not remove old folder - manual cleanup needed")
+                
+                print("Migration completed")
+            else:
+                # New install - no migration needed
+                print("New installation detected - no migration required")
+                
+        except Exception as e:
+            print(f"Migration check failed: {e}")
     
     def get_system_info(self):
         """Get static system information"""
