@@ -7,7 +7,7 @@
 !define VERSIONBUILD 0
 
 RequestExecutionLevel admin
-InstallDir "$PROGRAMFILES\${COMPANYNAME}\${APPNAME}"
+InstallDir "$PROGRAMFILES64\${COMPANYNAME}\${APPNAME}"
 Name "${APPNAME}"
 OutFile "nxtclone-agent-installer.exe"
 

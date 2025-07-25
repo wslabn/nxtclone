@@ -483,7 +483,7 @@
                     'Linux': 'ip addr show && ss -tuln'
                 },
                 'software': {
-                    'Windows': 'wmic product get name,version /format:table && echo. && echo Agent Version: && type "C:\\Program Files\\NxtClone\\NxtClone Agent\\version.txt" 2>nul || echo "Agent version file not found"',
+                    'Windows': 'wmic product get name,version /format:table && echo. && echo Agent Version: && type "C:\\Program Files\\NxtClone\\NxtClone Agent\\version.txt" 2>nul || type "C:\\Program Files (x86)\\NxtClone\\NxtClone Agent\\version.txt" 2>nul || echo "Agent version file not found"',
                     'Linux': 'dpkg -l | head -20 && echo && echo "Agent Version:" && cat /opt/nxtclone/version.txt 2>/dev/null || echo "Agent version file not found"'
                 }
             };
