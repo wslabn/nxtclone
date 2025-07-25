@@ -39,6 +39,28 @@ class RMMServer {
       res.json(machines);
     });
 
+    this.app.post('/api/cleanup-offline', (req, res) => {
+      try {
+        // Remove offline clients from memory
+        let removedCount = 0;
+        for (const [id, client] of this.clients.entries()) {
+          if (client.status === 'offline') {
+            this.clients.delete(id);
+            removedCount++;
+          }
+        }
+        
+        res.json({ 
+          success: true, 
+          count: removedCount,
+          message: `Removed ${removedCount} offline machines` 
+        });
+      } catch (error) {
+        console.error('Cleanup error:', error);
+        res.json({ success: false, error: error.message });
+      }
+    });
+
     this.app.post('/api/command', (req, res) => {
       const { machineId, command } = req.body;
       const client = this.clients.get(machineId);
@@ -63,6 +85,18 @@ class RMMServer {
         res.json(updateInfo);
       } catch (error) {
         res.json({ error: error.message });
+      }
+    });
+
+    this.app.get('/api/command-result/:id', (req, res) => {
+      const commandId = req.params.id;
+      const result = global.commandResults?.get(commandId);
+      
+      if (result) {
+        res.json({ success: true, result });
+        global.commandResults.delete(commandId); // Clean up after retrieval
+      } else {
+        res.json({ success: false, error: 'Result not found or expired' });
       }
     });
 
@@ -151,7 +185,13 @@ class RMMServer {
 
       case 'command_result':
         console.log(`Command result from ${message.hostname}:`, message.result);
-        // Here you could store results in database or forward to web clients
+        // Store result for web client retrieval
+        global.commandResults = global.commandResults || new Map();
+        global.commandResults.set(message.id, {
+          hostname: message.hostname,
+          result: message.result,
+          timestamp: Date.now()
+        });
         break;
     }
   }

@@ -26,6 +26,9 @@ mkdir -p /opt/nxtclone
 cp nxtclone-agent-linux /opt/nxtclone/nxtclone-agent
 chmod +x /opt/nxtclone/nxtclone-agent
 
+# Create version file
+echo "1.0.0" > /opt/nxtclone/version.txt
+
 # Create systemd service file
 cat > /etc/systemd/system/nxtclone-agent.service << EOF
 [Unit]

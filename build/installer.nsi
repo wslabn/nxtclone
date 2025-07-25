@@ -18,6 +18,11 @@ Section "install"
     SetOutPath $INSTDIR
     File "dist\nxtclone-agent.exe"
     
+    ; Create version file
+    FileOpen $0 "$INSTDIR\version.txt" w
+    FileWrite $0 "1.0.0"
+    FileClose $0
+    
     ; Create service
     ExecWait 'sc create "NxtClone Agent" binPath= "$INSTDIR\nxtclone-agent.exe" start= auto'
     ExecWait 'sc start "NxtClone Agent"'
@@ -40,6 +45,7 @@ Section "uninstall"
     ExecWait 'sc stop "NxtClone Agent"'
     ExecWait 'sc delete "NxtClone Agent"'
     Delete "$INSTDIR\nxtclone-agent.exe"
+    Delete "$INSTDIR\version.txt"
     Delete "$INSTDIR\uninstall.exe"
     RMDir "$INSTDIR"
     

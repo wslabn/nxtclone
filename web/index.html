@@ -83,6 +83,7 @@
         <div class="update-controls" style="margin: 10px 0;">
             <button onclick="checkForUpdates()">Check for Updates</button>
             <button onclick="updateAllAgents()">Update All Agents</button>
+            <button onclick="cleanupOfflineMachines()" style="background: #f44336;">Cleanup Offline</button>
             <span id="update-status"></span>
         </div>
         <div class="summary" id="summary"></div>
@@ -103,6 +104,30 @@
     <script>
         let machines = [];
 
+        async function cleanupOfflineMachines() {
+            if (!confirm('Remove all offline machines? This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/cleanup-offline', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Removed ${result.count} offline machines`);
+                    loadMachines(); // Refresh the list
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        
         async function loadMachines() {
             try {
                 const response = await fetch('/api/machines');
@@ -174,6 +199,9 @@
                         <button onclick="quickAction('${machine.id}', 'network')" 
                                 ${machine.status === 'offline' ? 'disabled' : ''} 
                                 style="background: #9c27b0; margin-right: 5px;">Network</button>
+                        <button onclick="quickAction('${machine.id}', 'software')" 
+                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                style="background: #607d8b; margin-right: 5px;">Software</button>
                     </div>
                     
                     <div class="command-section">
@@ -400,6 +428,10 @@
                 'network': {
                     'Windows': 'ipconfig /all && netstat -an | findstr LISTEN',
                     'Linux': 'ip addr show && ss -tuln'
+                },
+                'software': {
+                    'Windows': 'wmic product get name,version /format:table && echo. && echo Agent Version: && type "C:\\Program Files\\NxtClone\\NxtClone Agent\\version.txt" 2>nul || echo "Agent version file not found"',
+                    'Linux': 'dpkg -l | head -20 && echo && echo "Agent Version:" && cat /opt/nxtclone/version.txt 2>/dev/null || echo "Agent version file not found"'
                 }
             };
             
@@ -439,16 +471,12 @@
 
                 const result = await response.json();
                 
-                if (result.success) {
-                    if (showInModal) {
-                        // Wait a moment for command to execute, then fetch results
-                        setTimeout(() => {
-                            document.getElementById('modalOutput').textContent = 'Command sent successfully. Check server console for results.';
-                        }, 1000);
-                    } else {
-                        resultDiv.textContent = `Command sent: ${command}`;
-                        resultDiv.style.display = 'block';
-                    }
+                if (result.success && showInModal) {
+                    // Poll for command result
+                    pollForCommandResult(result.commandId, machine.hostname);
+                } else if (result.success) {
+                    resultDiv.textContent = `Command sent: ${command}`;
+                    resultDiv.style.display = 'block';
                 } else {
                     const errorMsg = `Error: ${result.error}`;
                     if (showInModal) {
@@ -467,6 +495,44 @@
                     resultDiv.style.display = 'block';
                 }
             }
+        }
+        
+        async function pollForCommandResult(commandId, hostname) {
+            let attempts = 0;
+            const maxAttempts = 20; // 10 seconds max
+            
+            const poll = async () => {
+                try {
+                    const response = await fetch(`/api/command-result/${commandId}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const result = data.result.result;
+                        let output = '';
+                        
+                        if (result.stdout) output += result.stdout;
+                        if (result.stderr) output += '\n--- STDERR ---\n' + result.stderr;
+                        if (result.error) output = 'Error: ' + result.error;
+                        if (result.returncode !== undefined) output += `\n--- Exit Code: ${result.returncode} ---`;
+                        
+                        document.getElementById('modalOutput').textContent = output || 'No output';
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(poll, 500);
+                    } else {
+                        document.getElementById('modalOutput').textContent = 'Command timed out or no response received';
+                    }
+                } catch (error) {
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(poll, 500);
+                    } else {
+                        document.getElementById('modalOutput').textContent = 'Failed to retrieve command result';
+                    }
+                }
+            };
+            
+            poll();
         }
         
         function closeModal() {
