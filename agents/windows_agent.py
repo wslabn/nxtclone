@@ -175,10 +175,37 @@ class WindowsAgent:
         except Exception as e:
             return {"error": str(e)}
 
-def install_service(server_url):
+def install_service(server_url=None):
     """Install as Windows service"""
     import subprocess
     import sys
+    
+    # Prompt for server URL if not provided
+    if not server_url:
+        try:
+            import tkinter as tk
+            from tkinter import simpledialog, messagebox
+            
+            root = tk.Tk()
+            root.withdraw()  # Hide main window
+            
+            server_url = simpledialog.askstring(
+                "NxtClone Agent Setup",
+                "Enter server URL (e.g., ws://192.168.1.100:3000):",
+                initialvalue="ws://localhost:3000"
+            )
+            
+            root.destroy()
+            
+            if not server_url:
+                print("Installation cancelled")
+                return
+                
+        except ImportError:
+            # Fallback to console input if tkinter not available
+            server_url = input("Enter server URL (e.g., ws://192.168.1.100:3000): ").strip()
+            if not server_url:
+                server_url = "ws://localhost:3000"
     
     service_name = "NxtClone Agent"
     exe_path = sys.executable if sys.executable.endswith('.exe') else sys.argv[0]
@@ -213,7 +240,7 @@ def uninstall_service():
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         if sys.argv[1] == "install":
-            server_url = sys.argv[2] if len(sys.argv) > 2 else "ws://localhost:3000"
+            server_url = sys.argv[2] if len(sys.argv) > 2 else None
             install_service(server_url)
             sys.exit(0)
         elif sys.argv[1] == "uninstall":
