@@ -182,30 +182,23 @@ def install_service(server_url=None):
     
     # Prompt for server URL if not provided
     if not server_url:
-        try:
-            import tkinter as tk
-            from tkinter import simpledialog, messagebox
-            
-            root = tk.Tk()
-            root.withdraw()  # Hide main window
-            
-            server_url = simpledialog.askstring(
-                "NxtClone Agent Setup",
-                "Enter server URL (e.g., ws://192.168.1.100:3000):",
-                initialvalue="ws://localhost:3000"
-            )
-            
-            root.destroy()
-            
-            if not server_url:
-                print("Installation cancelled")
-                return
-                
-        except ImportError:
-            # Fallback to console input if tkinter not available
-            server_url = input("Enter server URL (e.g., ws://192.168.1.100:3000): ").strip()
-            if not server_url:
-                server_url = "ws://localhost:3000"
+        print("\n=== NxtClone Agent Installation ===")
+        print("Please enter the server URL to connect to.")
+        print("Examples:")
+        print("  ws://192.168.1.100:3000")
+        print("  ws://server.domain.com:3000")
+        print("  ws://localhost:3000")
+        print()
+        
+        while True:
+            server_url = input("Server URL: ").strip()
+            if server_url:
+                if not server_url.startswith('ws://'):
+                    print("URL must start with 'ws://' - try again.")
+                    continue
+                break
+            else:
+                print("URL cannot be empty - try again.")
     
     service_name = "NxtClone Agent"
     exe_path = sys.executable if sys.executable.endswith('.exe') else sys.argv[0]
@@ -217,10 +210,12 @@ def install_service(server_url=None):
     if result.returncode == 0:
         print(f"Service '{service_name}' installed successfully")
         print(f"Server URL: {server_url}")
-        print("Starting service...")
-        subprocess.run(f'sc start "{service_name}"', shell=True)
+        print("Service will start automatically on next boot.")
+        print("To start now: sc start \"NxtClone Agent\"")
     else:
         print(f"Failed to install service: {result.stderr}")
+        if "already exists" in result.stderr:
+            print("Service already exists. Use 'uninstall' first, then 'install' again.")
 
 def uninstall_service():
     """Uninstall Windows service"""
@@ -250,7 +245,7 @@ if __name__ == "__main__":
             server_url = sys.argv[1]
         else:
             print("Usage:")
-            print("  nxtclone-agent.exe install [server_url]  - Install as service")
+            print("  nxtclone-agent.exe install [server_url]  - Install as service (prompts for URL if not provided)")
             print("  nxtclone-agent.exe uninstall             - Remove service")
             print("  nxtclone-agent.exe ws://server:port      - Run directly")
             sys.exit(1)
