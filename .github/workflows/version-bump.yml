@@ -1,46 +1,90 @@
-name: Version Bump
+name: Manual Release
 
 on:
   workflow_dispatch:
     inputs:
-      version_type:
-        description: 'Version bump type'
+      version:
+        description: 'Release version (e.g., 1.0.1)'
         required: true
-        default: 'patch'
-        type: choice
-        options:
-        - patch
-        - minor
-        - major
+        type: string
 
 jobs:
-  bump-version:
+  create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
     
-    - name: Configure Git
+    - name: Update version files
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        npm version ${{ github.event.inputs.version }} --no-git-tag-version
+        echo ${{ github.event.inputs.version }} > agents/version.txt
     
-    - name: Bump version
+    - name: Install dependencies and build
       run: |
-        npm version ${{ github.event.inputs.version_type }} --no-git-tag-version
-        NEW_VERSION=$(node -p "require('./package.json').version")
-        echo $NEW_VERSION > agents/version.txt
-        git add package.json agents/version.txt
-        git commit -m "Bump version to $NEW_VERSION"
-        git tag "v$NEW_VERSION"
-        git push origin main
-        git push origin "v$NEW_VERSION"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        npm install
+        mkdir -p dist
+        cp -r server dist/
+        cp -r agents dist/
+        cp -r web dist/
+        cp -r build dist/
+        cp package.json dist/
+        cp README.md dist/
+        cp DEPLOYMENT.md dist/
+        cd dist && zip -r ../nxtclone-v${{ github.event.inputs.version }}.zip .
+    
+    - name: Setup Python for builds
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Build Windows executable
+      run: |
+        cd build
+        pip install -r requirements-build.txt
+        python build-windows.py
+        mkdir -p ../releases
+        cp dist/nxtclone-agent.exe ../releases/nxtclone-agent-windows.exe
+    
+    - name: Build Linux executable
+      run: |
+        cd build
+        python build-linux.py
+        cp dist/nxtclone-agent ../releases/nxtclone-agent-linux
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.event.inputs.version }}
+        name: NxtClone v${{ github.event.inputs.version }}
+        body: |
+          ## NxtClone Release v${{ github.event.inputs.version }}
+          
+          ### Features
+          - Remote monitoring and management
+          - Cross-platform agents (Windows, Linux)
+          - Real-time system metrics
+          - Automatic updates
+          - Web-based dashboard
+          
+          ### Installation
+          1. Download and extract source code
+          2. Run `npm install`
+          3. Start server: `npm start`
+          4. Install agent deps: `pip install -r agents/requirements.txt`
+          5. Run agents on target machines
+          
+          Agents will auto-update from this release.
+        files: |
+          nxtclone-v${{ github.event.inputs.version }}.zip
+          releases/nxtclone-agent-windows.exe
+          releases/nxtclone-agent-linux
+        draft: false
+        prerelease: false
