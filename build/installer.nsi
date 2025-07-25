@@ -12,7 +12,7 @@
 !define INSTALLSIZE 10000
 
 RequestExecutionLevel admin
-InstallDir "$PROGRAMFILES\${COMPANYNAME}\${APPNAME}"
+InstallDir "$PROGRAMFILES64\${COMPANYNAME}\${APPNAME}"
 Name "${APPNAME}"
 Icon "icon.ico"
 outFile "syswatch-agent-installer.exe"
