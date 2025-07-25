@@ -1,6 +1,6 @@
 {
   "name": "nxtclone",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Remote monitoring and management system",
   "main": "server/index.js",
   "scripts": {
