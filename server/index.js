@@ -100,7 +100,18 @@ class RMMServer {
       }
     });
 
+    this.app.get('/api/update-status', (req, res) => {
+      const statuses = Array.from(global.updateStatuses?.entries() || []).map(([hostname, status]) => ({
+        hostname,
+        ...status
+      }));
+      res.json(statuses);
+    });
+
     this.app.post('/api/update-agents', (req, res) => {
+      // Clear previous update statuses
+      global.updateStatuses = new Map();
+      
       // Send update command to all connected agents
       const updateCommand = {
         type: 'update_request'
@@ -190,6 +201,18 @@ class RMMServer {
         global.commandResults.set(message.id, {
           hostname: message.hostname,
           result: message.result,
+          timestamp: Date.now()
+        });
+        break;
+        
+      case 'update_status':
+        console.log(`Update status from ${message.hostname}: ${message.status}`);
+        // Store update status
+        global.updateStatuses = global.updateStatuses || new Map();
+        global.updateStatuses.set(message.hostname, {
+          status: message.status,
+          version: message.version,
+          error: message.error,
           timestamp: Date.now()
         });
         break;

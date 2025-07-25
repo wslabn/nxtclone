@@ -395,8 +395,11 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    status.textContent = `Update request sent to ${result.agentsNotified} agents`;
-                    status.style.color = '#4caf50';
+                    status.textContent = `Update request sent to ${result.agentsNotified} agents. Monitoring progress...`;
+                    status.style.color = '#ff9800';
+                    
+                    // Start monitoring update progress
+                    monitorUpdateProgress();
                 } else {
                     status.textContent = 'Failed to send update request';
                     status.style.color = '#f44336';
@@ -405,6 +408,56 @@
                 status.textContent = `Update request failed: ${error.message}`;
                 status.style.color = '#f44336';
             }
+        }
+        
+        async function monitorUpdateProgress() {
+            const status = document.getElementById('update-status');
+            let attempts = 0;
+            const maxAttempts = 60; // 30 seconds
+            
+            const checkProgress = async () => {
+                try {
+                    const response = await fetch('/api/update-status');
+                    const statuses = await response.json();
+                    
+                    if (statuses.length === 0 && attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(checkProgress, 500);
+                        return;
+                    }
+                    
+                    const summary = statuses.reduce((acc, s) => {
+                        acc[s.status] = (acc[s.status] || 0) + 1;
+                        return acc;
+                    }, {});
+                    
+                    const total = statuses.length;
+                    const completed = (summary.up_to_date || 0) + (summary.error || 0);
+                    const updating = summary.updating || 0;
+                    
+                    if (completed === total) {
+                        status.textContent = `Updates complete: ${summary.up_to_date || 0} up-to-date, ${summary.error || 0} errors`;
+                        status.style.color = summary.error ? '#ff9800' : '#4caf50';
+                    } else if (attempts < maxAttempts) {
+                        status.textContent = `Updating: ${updating} in progress, ${completed}/${total} complete`;
+                        attempts++;
+                        setTimeout(checkProgress, 500);
+                    } else {
+                        status.textContent = 'Update monitoring timed out';
+                        status.style.color = '#f44336';
+                    }
+                } catch (error) {
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(checkProgress, 500);
+                    } else {
+                        status.textContent = 'Failed to monitor update progress';
+                        status.style.color = '#f44336';
+                    }
+                }
+            };
+            
+            checkProgress();
         }
 
         function quickAction(machineId, action) {

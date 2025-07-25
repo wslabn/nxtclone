@@ -52,7 +52,21 @@ class LinuxAgent:
         """Check for updates every 2 hours and auto-update"""
         while True:
             try:
-                await asyncio.sleep(2 * 3600)  # 2 hours
+                # Check for manual update trigger file
+                if os.path.exists('/tmp/nxtclone-update-now'):
+                    os.remove('/tmp/nxtclone-update-now')
+                    print("Manual update trigger detected")
+                    update_info = self.updater.check_for_updates()
+                    if update_info.get("has_update"):
+                        print(f"Manual update: {update_info['current_version']} -> {update_info['latest_version']}")
+                        if self.updater.download_and_update(update_info["download_url"]):
+                            print("Manual update successful, restarting...")
+                            self.updater.restart_agent()
+                
+                await asyncio.sleep(30)  # Check every 30 seconds for trigger file
+                
+                # Regular 2-hour update check
+                await asyncio.sleep(2 * 3600 - 30)  # 2 hours minus the 30 seconds above
                 update_info = self.updater.check_for_updates()
                 if update_info.get("has_update"):
                     print(f"Auto-update available: {update_info['current_version']} -> {update_info['latest_version']}")
@@ -130,15 +144,40 @@ class LinuxAgent:
         elif message["type"] == "update_request":
             print("Auto-update request received")
             try:
+                # Send status update
+                await websocket.send(json.dumps({
+                    "type": "update_status",
+                    "hostname": self.hostname,
+                    "status": "checking"
+                }))
+                
                 update_info = self.updater.check_for_updates()
                 if update_info.get("has_update"):
+                    await websocket.send(json.dumps({
+                        "type": "update_status",
+                        "hostname": self.hostname,
+                        "status": "updating",
+                        "version": update_info['latest_version']
+                    }))
+                    
                     print(f"Auto-updating: {update_info['current_version']} -> {update_info['latest_version']}")
                     if self.updater.download_and_update(update_info["download_url"]):
                         print("Update successful, restarting...")
                         self.updater.restart_agent()
                 else:
+                    await websocket.send(json.dumps({
+                        "type": "update_status",
+                        "hostname": self.hostname,
+                        "status": "up_to_date"
+                    }))
                     print("Agent is already up to date")
             except Exception as e:
+                await websocket.send(json.dumps({
+                    "type": "update_status",
+                    "hostname": self.hostname,
+                    "status": "error",
+                    "error": str(e)
+                }))
                 print(f"Auto-update failed: {e}")
     
     def get_system_info(self):
