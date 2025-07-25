@@ -4,12 +4,14 @@ import shutil
 
 def build_windows_agent():
     # Build the Windows agent executable
+    import sys
+    separator = ';' if sys.platform == 'win32' else ':'
+    
     PyInstaller.__main__.run([
         '--onefile',
-        '--noconsole',
         '--name=nxtclone-agent',
-        '--add-data=../agents/version.txt;.',
-        '--add-data=../agents/agent_updater.py;.',
+        f'--add-data=../agents/version.txt{separator}.',
+        f'--add-data=../agents/agent_updater.py{separator}.',
         '../agents/windows_agent.py'
     ])
     

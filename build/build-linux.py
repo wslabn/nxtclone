@@ -3,11 +3,14 @@ import os
 
 def build_linux_agent():
     # Build the Linux agent executable
+    import sys
+    separator = ';' if sys.platform == 'win32' else ':'
+    
     PyInstaller.__main__.run([
         '--onefile',
         '--name=nxtclone-agent',
-        '--add-data=../agents/version.txt:.',
-        '--add-data=../agents/agent_updater.py:.',
+        f'--add-data=../agents/version.txt{separator}.',
+        f'--add-data=../agents/agent_updater.py{separator}.',
         '../agents/linux_agent.py'
     ])
     
