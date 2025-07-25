@@ -68,12 +68,14 @@ python windows_agent.py ws://your-server:3000
 **Windows Service Installation:**
 1. Download `nxtclone-agent-installer.exe` from releases
 2. Run as administrator
-3. Agent installs as Windows service and starts automatically
+3. Enter server URL when prompted (e.g., `ws://192.168.1.100:3000`)
+4. Agent installs as Windows service and starts automatically
 
 **Linux Service Installation:**
 1. Download `nxtclone-agent-linux` and `install-linux.sh`
-2. Run: `sudo ./install-linux.sh`
-3. Agent installs as systemd service and starts automatically
+2. Run: `sudo ./install-linux.sh [server_url]`
+3. Example: `sudo ./install-linux.sh ws://192.168.1.100:3000`
+4. Agent installs as systemd service and starts automatically
 
 **Manual Execution:**
 - Windows: `nxtclone-agent-windows.exe`
@@ -95,20 +97,31 @@ python windows_agent.py ws://your-server:3000
 - **System**: Platform details, uptime, boot time
 - **Processes**: Active process count and management
 - **Network**: I/O statistics and connectivity status
+- **Software**: Installed programs and agent version information
 
 ## Command Examples
 
 - **Windows**: `dir`, `systeminfo`, `tasklist`, `wmic cpu get name`
 - **Linux**: `ls -la`, `ps aux`, `df -h`, `uname -a`, `top -n1`
 
+## Quick Action Buttons
+
+- **Shutdown/Reboot**: Safe system restart with confirmation
+- **Processes**: View running processes and resource usage
+- **Services**: List system services and their status
+- **Network**: Display network configuration and connections
+- **Software**: Show installed software and agent version
+
 ## Auto-Update System
 
-- **Automatic Detection**: Server checks GitHub releases every 30 minutes
+- **Automatic Detection**: Agents check GitHub releases every 2 hours
+- **Manual Updates**: "Update All Agents" button for immediate updates
 - **Zero-Touch Updates**: Agents update automatically without intervention
-- **Executable Updates**: Both source and compiled agents update seamlessly
+- **Real-time Progress**: Dashboard shows update status and progress
 - **Service Integration**: Windows services and Linux systemd units restart automatically
 - **Version Management**: Synchronized versioning across all components
 - **Enterprise Ready**: GitHub Actions for automated release management
+- **Local Triggers**: Force updates locally via service restart or trigger files
 
 ## Building Executables
 
@@ -161,30 +174,17 @@ Create releases via GitHub Actions:
 ## License
 
 MIT License - see LICENSE file for details
-<<<<<<< HEAD
-=======
-- TLS encryption
-- Command validation
-- Rate limiting
-- Audit logging
-## Project Stats
-- Total Code Files: 6
-- Last Updated: 2025-07-25
->>>>>>> 377f45da1f1a00d29401f5a16cd2764b4bcd56ec
-=======
-## Project Stats
-- Total Code Files: 8
-- Last Updated: 2025-07-25
->>>>>>> cf673f28e2dad8f57b12a2f84462901e6ccdd272
+
+## Dashboard Features
+
+- **Real-time Monitoring**: Live system metrics with progress bars
+- **Machine Management**: Online/offline status with cleanup tools
+- **Remote Commands**: Execute commands with modal result display
+- **Update Management**: Check for updates and monitor progress
+- **Quick Actions**: Pre-configured system management buttons
+- **Software Inventory**: View installed programs and versions
 
 ## Project Stats
-- Total Code Files: 9
+- Total Code Files: 12
 - Last Updated: 2025-07-25
-
-## Project Stats
-- Total Code Files: 9
-- Last Updated: 2025-07-25
-
-## Project Stats
-- Total Code Files: 9
-- Last Updated: 2025-07-25
+- Current Version: 1.1.1

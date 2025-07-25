@@ -16,6 +16,15 @@ def build_windows_agent():
     ])
     
     print("Windows agent built successfully!")
+    
+    # Build installer with NSIS
+    try:
+        import subprocess
+        subprocess.run(['makensis', 'installer.nsi'], check=True)
+        print("Windows installer built successfully!")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("NSIS not found - installer not built. Agent executable created.")
+        print("To build installer manually: makensis installer.nsi")
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
