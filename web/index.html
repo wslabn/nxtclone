@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RMM Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .machine { 
+            background: white;
+            border: 1px solid #ddd; 
+            margin: 15px 0; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .online { border-left: 5px solid #4CAF50; }
+        .offline { border-left: 5px solid #f44336; }
+        .machine-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .system-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 15px 0; }
+        .info-card { background: #f8f9fa; padding: 12px; border-radius: 6px; border: 1px solid #e9ecef; }
+        .info-card h4 { margin: 0 0 8px 0; color: #495057; font-size: 14px; }
+        .info-value { font-size: 16px; font-weight: bold; color: #212529; }
+        .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 15px 0; }
+        .metric { background: #e3f2fd; padding: 10px; border-radius: 6px; text-align: center; }
+        .metric-label { font-size: 12px; color: #666; }
+        .metric-value { font-size: 18px; font-weight: bold; color: #1976d2; }
+        .progress-bar { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+        .progress-fill { height: 100%; transition: width 0.3s ease; }
+        .cpu-bar { background: #ff9800; }
+        .memory-bar { background: #4caf50; }
+        .disk-bar { background: #f44336; }
+        .command-section { 
+            margin-top: 20px; 
+            padding-top: 15px; 
+            border-top: 2px solid #eee; 
+        }
+        input[type="text"] { 
+            width: 300px; 
+            padding: 8px; 
+            margin-right: 10px; 
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button { 
+            padding: 8px 16px; 
+            background: #007cba; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        button:hover { background: #005a87; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .result { 
+            margin-top: 10px; 
+            padding: 12px; 
+            background: #f5f5f5; 
+            border-radius: 4px; 
+            font-family: monospace; 
+            white-space: pre-wrap; 
+            border: 1px solid #ddd;
+        }
+        .status { font-weight: bold; }
+        .online-status { color: #4CAF50; }
+        .offline-status { color: #f44336; }
+        .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .summary-card { background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .summary-number { font-size: 24px; font-weight: bold; }
+        .summary-label { font-size: 12px; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>RMM Dashboard</h1>
+        <div class="update-controls" style="margin: 10px 0;">
+            <button onclick="checkForUpdates()">Check for Updates</button>
+            <button onclick="updateAllAgents()">Update All Agents</button>
+            <span id="update-status"></span>
+        </div>
+        <div class="summary" id="summary"></div>
+    </div>
+    <div id="machines"></div>
+
+    <script>
+        let machines = [];
+
+        async function loadMachines() {
+            try {
+                const response = await fetch('/api/machines');
+                machines = await response.json();
+                renderMachines();
+            } catch (error) {
+                console.error('Failed to load machines:', error);
+            }
+        }
+
+        function renderMachines() {
+            renderSummary();
+            
+            const container = document.getElementById('machines');
+            container.innerHTML = '';
+
+            if (machines.length === 0) {
+                container.innerHTML = '<div class="machine"><p>No machines connected</p></div>';
+                return;
+            }
+
+            machines.forEach(machine => {
+                const div = document.createElement('div');
+                div.className = `machine ${machine.status}`;
+                
+                const lastSeen = new Date(machine.lastSeen).toLocaleString();
+                const statusClass = machine.status === 'online' ? 'online-status' : 'offline-status';
+                
+                div.innerHTML = `
+                    <div class="machine-header">
+                        <div>
+                            <h3>${machine.hostname}</h3>
+                            <p><strong>Status:</strong> <span class="status ${statusClass}">${machine.status.toUpperCase()}</span> | <strong>Last Seen:</strong> ${lastSeen}</p>
+                        </div>
+                    </div>
+                    
+                    ${renderSystemInfo(machine)}
+                    ${machine.status === 'online' ? renderMetrics(machine) : ''}
+                    
+                    <div class="command-section">
+                        <input type="text" id="cmd-${machine.id}" placeholder="Enter command..." 
+                               ${machine.status === 'offline' ? 'disabled' : ''}>
+                        <button onclick="executeCommand('${machine.id}')" 
+                                ${machine.status === 'offline' ? 'disabled' : ''}>Execute</button>
+                        <div id="result-${machine.id}" class="result" style="display: none;"></div>
+                    </div>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+        
+        function renderSummary() {
+            const summary = document.getElementById('summary');
+            const online = machines.filter(m => m.status === 'online').length;
+            const offline = machines.length - online;
+            
+            summary.innerHTML = `
+                <div class="summary-card">
+                    <div class="summary-number" style="color: #4CAF50;">${online}</div>
+                    <div class="summary-label">Online</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number" style="color: #f44336;">${offline}</div>
+                    <div class="summary-label">Offline</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number">${machines.length}</div>
+                    <div class="summary-label">Total Machines</div>
+                </div>
+            `;
+        }
+        
+        function renderSystemInfo(machine) {
+            const info = machine.systemInfo || {};
+            if (!info.cpu_count) return '<p><em>System information not available</em></p>';
+            
+            return `
+                <div class="system-info">
+                    <div class="info-card">
+                        <h4>Platform</h4>
+                        <div class="info-value">${machine.platform}</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>CPU Cores</h4>
+                        <div class="info-value">${info.cpu_count}</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Memory</h4>
+                        <div class="info-value">${formatBytes(info.memory_total)}</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Disk Space</h4>
+                        <div class="info-value">${formatBytes(info.disk_total)}</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Architecture</h4>
+                        <div class="info-value">${info.architecture || 'Unknown'}</div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Uptime</h4>
+                        <div class="info-value">${formatUptime(info.boot_time)}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderMetrics(machine) {
+            const metrics = machine.metrics || {};
+            if (!metrics.cpu_percent) return '';
+            
+            return `
+                <div class="metrics">
+                    <div class="metric">
+                        <div class="metric-label">CPU Usage</div>
+                        <div class="metric-value">${metrics.cpu_percent.toFixed(1)}%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill cpu-bar" style="width: ${metrics.cpu_percent}%"></div>
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Memory Usage</div>
+                        <div class="metric-value">${metrics.memory_percent.toFixed(1)}%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill memory-bar" style="width: ${metrics.memory_percent}%"></div>
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Disk Usage</div>
+                        <div class="metric-value">${metrics.disk_percent.toFixed(1)}%</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill disk-bar" style="width: ${metrics.disk_percent}%"></div>
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Processes</div>
+                        <div class="metric-value">${metrics.process_count}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function formatBytes(bytes) {
+            if (!bytes) return 'Unknown';
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+        }
+        
+        function formatUptime(bootTime) {
+            if (!bootTime) return 'Unknown';
+            const uptime = Date.now() / 1000 - bootTime;
+            const days = Math.floor(uptime / 86400);
+            const hours = Math.floor((uptime % 86400) / 3600);
+            return `${days}d ${hours}h`;
+        }
+
+        async function executeCommand(machineId) {
+            const input = document.getElementById(`cmd-${machineId}`);
+            const resultDiv = document.getElementById(`result-${machineId}`);
+            const command = input.value.trim();
+            
+            if (!command) return;
+
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId, command })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.textContent = 'Command sent successfully. Check server logs for results.';
+                    resultDiv.style.display = 'block';
+                    input.value = '';
+                } else {
+                    resultDiv.textContent = `Error: ${result.error}`;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        }
+
+        async function checkForUpdates() {
+            const status = document.getElementById('update-status');
+            status.textContent = 'Checking for updates...';
+            
+            try {
+                const response = await fetch('/api/update-check');
+                const result = await response.json();
+                
+                if (result.hasUpdate) {
+                    status.textContent = `Update available: ${result.currentVersion} -> ${result.latestVersion}`;
+                    status.style.color = '#ff9800';
+                } else {
+                    status.textContent = 'No updates available';
+                    status.style.color = '#4caf50';
+                }
+            } catch (error) {
+                status.textContent = `Update check failed: ${error.message}`;
+                status.style.color = '#f44336';
+            }
+        }
+        
+        async function updateAllAgents() {
+            const status = document.getElementById('update-status');
+            status.textContent = 'Sending update request to agents...';
+            
+            try {
+                const response = await fetch('/api/update-agents', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    status.textContent = `Update request sent to ${result.agentsNotified} agents`;
+                    status.style.color = '#4caf50';
+                } else {
+                    status.textContent = 'Failed to send update request';
+                    status.style.color = '#f44336';
+                }
+            } catch (error) {
+                status.textContent = `Update request failed: ${error.message}`;
+                status.style.color = '#f44336';
+            }
+        }
+
+        // Auto-refresh every 5 seconds
+        setInterval(loadMachines, 5000);
+        
+        // Initial load
+        loadMachines();
+    </script>
+</body>
+</html>
