@@ -14,7 +14,6 @@
 RequestExecutionLevel admin
 InstallDir "$PROGRAMFILES\${COMPANYNAME}\${APPNAME}"
 Name "${APPNAME}"
-Icon "icon.ico"
 outFile "nxtclone-agent-installer.exe"
 
 !include LogicLib.nsh
