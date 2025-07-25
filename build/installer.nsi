@@ -11,8 +11,32 @@ InstallDir "$PROGRAMFILES\${COMPANYNAME}\${APPNAME}"
 Name "${APPNAME}"
 OutFile "nxtclone-agent-installer.exe"
 
+!include "MUI2.nsh"
+!include "nsDialogs.nsh"
+!include "LogicLib.nsh"
+
 Page directory
+Page custom ServerURLPage
 Page instfiles
+
+Var ServerURL
+
+Function ServerURLPage
+    !insertmacro MUI_HEADER_TEXT "Server Configuration" "Enter the RMM server URL"
+    
+    nsDialogs::Create 1018
+    Pop $0
+    
+    ${NSD_CreateLabel} 0 0 100% 12u "Enter the RMM server URL (e.g., ws://192.168.1.100:3000):"
+    Pop $0
+    
+    ${NSD_CreateText} 0 20u 100% 12u "ws://localhost:3000"
+    Pop $1
+    
+    nsDialogs::Show
+    
+    ${NSD_GetText} $1 $ServerURL
+FunctionEnd
 
 Section "install"
     SetOutPath $INSTDIR
@@ -23,8 +47,8 @@ Section "install"
     FileWrite $0 "1.0.0"
     FileClose $0
     
-    ; Create service
-    ExecWait 'sc create "NxtClone Agent" binPath= "$INSTDIR\nxtclone-agent.exe" start= auto'
+    ; Create service with server URL
+    ExecWait 'sc create "NxtClone Agent" binPath= "$INSTDIR\nxtclone-agent.exe $ServerURL" start= auto'
     ExecWait 'sc start "NxtClone Agent"'
     
     ; Create uninstaller
