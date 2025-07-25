@@ -161,6 +161,7 @@ Create releases via GitHub Actions:
 ## License
 
 MIT License - see LICENSE file for details
+<<<<<<< HEAD
 =======
 - TLS encryption
 - Command validation
@@ -170,3 +171,8 @@ MIT License - see LICENSE file for details
 - Total Code Files: 6
 - Last Updated: 2025-07-25
 >>>>>>> 377f45da1f1a00d29401f5a16cd2764b4bcd56ec
+=======
+## Project Stats
+- Total Code Files: 8
+- Last Updated: 2025-07-25
+>>>>>>> cf673f28e2dad8f57b12a2f84462901e6ccdd272
