@@ -65,7 +65,7 @@ jobs:
         & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
         
         mkdir -p ../releases
-        copy nxtclone-agent-installer.exe ..\releases\nxtclone-agent-installer.exe
+        copy syswatch-agent-installer.exe ..\releases\syswatch-agent-installer.exe
     
     - name: Build Linux executable
       if: matrix.os == 'ubuntu-latest'
@@ -74,7 +74,7 @@ jobs:
         pip install -r requirements-build.txt
         python build-linux.py
         mkdir -p ../releases
-        cp dist/nxtclone-agent ../releases/nxtclone-agent-linux
+        cp dist/syswatch-agent ../releases/syswatch-agent-linux
         cp install-linux.sh ../releases/
     
     - name: Upload artifacts
@@ -108,7 +108,7 @@ jobs:
         cp package.json dist/
         cp README.md dist/
         cp DEPLOYMENT.md dist/
-        cd dist && zip -r ../nxtclone-v${{ needs.check-version.outputs.new-version }}.zip .
+        cd dist && zip -r ../syswatch-v${{ needs.check-version.outputs.new-version }}.zip .
     
     - name: Download all artifacts
       uses: actions/download-artifact@v4
@@ -131,9 +131,9 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ needs.check-version.outputs.new-version }}
-        name: NxtClone v${{ needs.check-version.outputs.new-version }}
+        name: SysWatch v${{ needs.check-version.outputs.new-version }}
         body: |
-          ## NxtClone Release v${{ needs.check-version.outputs.new-version }}
+          ## SysWatch Release v${{ needs.check-version.outputs.new-version }}
           
           ### Features
           - Remote monitoring and management
@@ -144,8 +144,8 @@ jobs:
           
           ### Installation
           **Option A - Executables (Recommended):**
-          - Windows: Download and run `nxtclone-agent-windows.exe`
-          - Linux: Download `nxtclone-agent-linux`, run `chmod +x nxtclone-agent-linux && ./nxtclone-agent-linux`
+          - Windows: Download and run `syswatch-agent-installer.exe`
+          - Linux: Download `syswatch-agent-linux`, run `chmod +x syswatch-agent-linux && ./syswatch-agent-linux`
           
           **Option B - Source:**
           1. Download and extract source code
@@ -156,7 +156,7 @@ jobs:
           ### Auto-Update
           Agents will automatically update from this release.
         files: |
-          nxtclone-v${{ needs.check-version.outputs.new-version }}.zip
+          syswatch-v${{ needs.check-version.outputs.new-version }}.zip
           final-releases/*
         draft: false
         prerelease: false

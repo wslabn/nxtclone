@@ -3,13 +3,21 @@ import os
 import shutil
 
 def build_windows_agent():
+    # Create icon first
+    try:
+        import subprocess
+        subprocess.run(['python', 'create_icon.py'], check=True)
+        print("Icon created successfully!")
+    except Exception as e:
+        print(f"Icon creation failed: {e}")
+    
     # Build the Windows agent executable
     import sys
     separator = ';' if sys.platform == 'win32' else ':'
     
     PyInstaller.__main__.run([
         '--onefile',
-        '--name=nxtclone-agent',
+        '--name=syswatch-agent',
         f'--add-data=../agents/version.txt{separator}.',
         f'--add-data=../agents/agent_updater.py{separator}.',
         f'--add-data=../agents/windows_agent.py{separator}.',

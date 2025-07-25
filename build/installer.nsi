@@ -1,20 +1,21 @@
-!define APPNAME "NxtClone Agent"
-!define COMPANYNAME "NxtClone"
+!define APPNAME "SysWatch Agent"
+!define COMPANYNAME "SysWatch"
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
 !define VERSIONBUILD 8
 
-!define HELPURL "https://github.com/your-username/nxtclone"
-!define UPDATEURL "https://github.com/your-username/nxtclone/releases"
-!define ABOUTURL "https://github.com/your-username/nxtclone"
+!define HELPURL "https://github.com/your-username/syswatch"
+!define UPDATEURL "https://github.com/your-username/syswatch/releases"
+!define ABOUTURL "https://github.com/your-username/syswatch"
 
 !define INSTALLSIZE 10000
 
 RequestExecutionLevel admin
 InstallDir "$PROGRAMFILES\${COMPANYNAME}\${APPNAME}"
 Name "${APPNAME}"
-outFile "nxtclone-agent-installer.exe"
+Icon "icon.ico"
+outFile "syswatch-agent-installer.exe"
 
 !include LogicLib.nsh
 !include nsDialogs.nsh
@@ -67,10 +68,10 @@ Section "install"
     SetOutPath $INSTDIR
     
     # Copy the agent executable
-    File "dist\nxtclone-agent.exe"
+    File "dist\syswatch-agent.exe"
     
     # Verify file was copied
-    IfFileExists "$INSTDIR\nxtclone-agent.exe" +2 0
+    IfFileExists "$INSTDIR\syswatch-agent.exe" +2 0
     MessageBox MB_OK "Error: Agent executable not found after copy!"
     
     # Stop existing service if running
@@ -78,7 +79,7 @@ Section "install"
     ExecWait 'sc delete "${APPNAME}"'
     
     # Create the service with the provided server URL
-    ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\nxtclone-agent.exe\" $ServerUrl" start= auto'
+    ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\syswatch-agent.exe\" $ServerUrl" start= auto'
     
     # Don't start service automatically - let user start it manually
     # ExecWait 'sc start "${APPNAME}"'
@@ -103,7 +104,7 @@ Section "install"
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "NoRepair" 1
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "EstimatedSize" ${INSTALLSIZE}
     
-    MessageBox MB_OK "Installation complete! The NxtClone Agent service has been installed and started."
+    MessageBox MB_OK "Installation complete! The SysWatch Agent service has been installed."
 SectionEnd
 
 Section "uninstall"
@@ -112,7 +113,7 @@ Section "uninstall"
     ExecWait 'sc delete "${APPNAME}"'
     
     # Remove files
-    Delete "$INSTDIR\nxtclone-agent.exe"
+    Delete "$INSTDIR\syswatch-agent.exe"
     Delete "$INSTDIR\uninstall.exe"
     RMDir "$INSTDIR"
     
