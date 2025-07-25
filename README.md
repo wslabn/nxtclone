@@ -160,3 +160,6 @@ Create releases via GitHub Actions:
 ## License
 
 MIT License - see LICENSE file for details
+## Project Stats
+- Total Code Files: 8
+- Last Updated: 2025-07-25
