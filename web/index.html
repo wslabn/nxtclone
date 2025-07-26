@@ -5,40 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SysWatch Dashboard</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/theme.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; display: flex; }
-        .sidebar { width: 250px; background: white; height: 100vh; box-shadow: 2px 0 4px rgba(0,0,0,0.1); padding: 20px; overflow-y: auto; }
+        :root {
+            --bg-color: #f5f5f5;
+            --card-bg: white;
+            --text-color: #212529;
+            --border-color: #ddd;
+            --shadow: 0 2px 4px rgba(0,0,0,0.1);
+            --info-card-bg: #f8f9fa;
+            --metric-bg: #e3f2fd;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1e1e1e;
+                --card-bg: #252526;
+                --text-color: #cccccc;
+                --border-color: #3c3c3c;
+                --shadow: 0 2px 4px rgba(0,0,0,0.5);
+                --info-card-bg: #2d2d30;
+                --metric-bg: #37373d;
+            }
+        }
+        
+        body { font-family: Arial, sans-serif; margin: 0; background: var(--bg-color); color: var(--text-color); display: flex; }
+        .sidebar { width: 250px; background: var(--card-bg); height: 100vh; box-shadow: var(--shadow); padding: 20px; overflow-y: auto; }
         .main-content { flex: 1; padding: 20px; }
-        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .group { margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; cursor: pointer; }
+        .header { background: var(--card-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: var(--shadow); }
+        .group { margin: 10px 0; padding: 10px; background: var(--info-card-bg); border-radius: 4px; cursor: pointer; }
         .group.active { background: #007cba; color: white; }
         .group-machines { font-size: 12px; color: #666; margin-top: 5px; }
         .group.active .group-machines { color: #ccc; }
         .group.active .machine-item { background: rgba(255,255,255,0.1); color: white; }
         .group.active .machine-item span { color: white; }
         .add-group { background: #4caf50; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; }
-        .machine-item { display: flex; align-items: center; margin: 5px 0; padding: 5px; background: #fff; border-radius: 3px; font-size: 12px; }
+        .machine-item { display: flex; align-items: center; margin: 5px 0; padding: 5px; background: var(--card-bg); border-radius: 3px; font-size: 12px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
         .status-online { background: #4caf50; }
         .status-offline { background: #f44336; }
         .assign-group { background: #2196f3; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px; cursor: pointer; }
         .machine { 
-            background: white;
-            border: 1px solid #ddd; 
+            background: var(--card-bg);
+            border: 1px solid var(--border-color); 
             margin: 15px 0; 
             padding: 20px; 
             border-radius: 8px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow);
         }
         .online { border-left: 5px solid #4CAF50; }
         .offline { border-left: 5px solid #f44336; }
         .machine-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .system-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 15px 0; }
-        .info-card { background: #f8f9fa; padding: 12px; border-radius: 6px; border: 1px solid #e9ecef; }
-        .info-card h4 { margin: 0 0 8px 0; color: #495057; font-size: 14px; }
-        .info-value { font-size: 16px; font-weight: bold; color: #212529; }
+        .info-card { background: var(--info-card-bg); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color); }
+        .info-card h4 { margin: 0 0 8px 0; color: var(--text-color); font-size: 14px; opacity: 0.8; }
+        .info-value { font-size: 16px; font-weight: bold; color: var(--text-color); }
         .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 15px 0; }
-        .metric { background: #e3f2fd; padding: 10px; border-radius: 6px; text-align: center; }
+        .metric { background: var(--metric-bg); padding: 10px; border-radius: 6px; text-align: center; }
         .metric-label { font-size: 12px; color: #666; }
         .metric-value { font-size: 18px; font-weight: bold; color: #1976d2; }
         .progress-bar { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin-top: 5px; }
@@ -55,8 +79,10 @@
             width: 300px; 
             padding: 8px; 
             margin-right: 10px; 
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color);
             border-radius: 4px;
+            background: var(--card-bg);
+            color: var(--text-color);
         }
         button { 
             padding: 8px 16px; 
@@ -71,25 +97,25 @@
         .result { 
             margin-top: 10px; 
             padding: 12px; 
-            background: #f5f5f5; 
+            background: var(--info-card-bg); 
             border-radius: 4px; 
             font-family: monospace; 
             white-space: pre-wrap; 
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color);
         }
         .status { font-weight: bold; }
         .online-status { color: #4CAF50; }
         .offline-status { color: #f44336; }
         .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .summary-card { background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .summary-card { background: var(--card-bg); padding: 15px; border-radius: 8px; text-align: center; box-shadow: var(--shadow); }
         .summary-number { font-size: 24px; font-weight: bold; }
         .summary-label { font-size: 12px; color: #666; margin-top: 5px; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 800px; max-height: 80%; overflow-y: auto; }
+        .modal-content { background-color: var(--card-bg); margin: 5% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 800px; max-height: 80%; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .modal-close { font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; }
         .modal-close:hover { color: #000; }
-        .modal-output { background: #f5f5f5; padding: 15px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; }
+        .modal-output { background: var(--info-card-bg); padding: 15px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); }
     </style>
 </head>
 <body>
@@ -221,7 +247,7 @@
                     </div>
                     
                     ${renderSystemInfo(machine)}
-                    ${machine.status === 'online' ? renderMetrics(machine) : ''}
+                    ${renderMetrics(machine)}
                     
                     <div class="quick-actions" style="margin: 15px 0;">
                         <h4>Quick Actions:</h4>
@@ -250,6 +276,8 @@
                                 ${machine.status === 'offline' ? 'disabled' : ''} 
                                 style="background: #ff5722; margin-right: 5px;">Update</button>
                     </div>
+                    
+
                     
                     <div class="command-section">
                         <input type="text" id="cmd-${machine.id}" placeholder="Enter command..." 
@@ -338,32 +366,35 @@
         
         function renderMetrics(machine) {
             const metrics = machine.metrics || {};
-            if (!metrics.cpu_percent) return '';
+            if (!metrics.cpu_percent) return '<p><em>No metrics data available</em></p>';
+            
+            const statusNote = machine.status === 'offline' ? '<p style="color: #f44336; font-size: 12px; margin-bottom: 10px;"><em>Last known metrics (machine offline)</em></p>' : '';
             
             return `
+                ${statusNote}
                 <div class="metrics">
-                    <div class="metric">
+                    <div class="metric" onclick="showMetricGraph('${machine.id}', 'cpu', '${machine.hostname}')" style="cursor: pointer;${machine.status === 'offline' ? 'opacity: 0.7;' : ''}">
                         <div class="metric-label">CPU Usage</div>
                         <div class="metric-value">${metrics.cpu_percent.toFixed(1)}%</div>
                         <div class="progress-bar">
                             <div class="progress-fill cpu-bar" style="width: ${metrics.cpu_percent}%"></div>
                         </div>
                     </div>
-                    <div class="metric">
+                    <div class="metric" onclick="showMetricGraph('${machine.id}', 'memory', '${machine.hostname}')" style="cursor: pointer;${machine.status === 'offline' ? 'opacity: 0.7;' : ''}">
                         <div class="metric-label">Memory Usage</div>
                         <div class="metric-value">${metrics.memory_percent.toFixed(1)}%</div>
                         <div class="progress-bar">
                             <div class="progress-fill memory-bar" style="width: ${metrics.memory_percent}%"></div>
                         </div>
                     </div>
-                    <div class="metric">
+                    <div class="metric" onclick="showMetricGraph('${machine.id}', 'disk', '${machine.hostname}')" style="cursor: pointer;${machine.status === 'offline' ? 'opacity: 0.7;' : ''}">
                         <div class="metric-label">Disk Usage</div>
                         <div class="metric-value">${metrics.disk_percent.toFixed(1)}%</div>
                         <div class="progress-bar">
                             <div class="progress-fill disk-bar" style="width: ${metrics.disk_percent}%"></div>
                         </div>
                     </div>
-                    <div class="metric">
+                    <div class="metric" onclick="showMetricGraph('${machine.id}', 'process', '${machine.hostname}')" style="cursor: pointer;${machine.status === 'offline' ? 'opacity: 0.7;' : ''}">
                         <div class="metric-label">Processes</div>
                         <div class="metric-value">${metrics.process_count}</div>
                     </div>
@@ -1016,11 +1047,11 @@
             modal.id = 'assignModal';
             modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000';
             modal.innerHTML = `
-                <div style="background:white;padding:20px;border-radius:8px;min-width:300px;position:relative">
-                    <button onclick="closeAssignModal()" style="position:absolute;top:10px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;color:#999">&times;</button>
+                <div style="background:var(--card-bg);padding:20px;border-radius:8px;min-width:300px;position:relative;color:var(--text-color)">
+                    <button onclick="closeAssignModal()" style="position:absolute;top:10px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-color);opacity:0.7">&times;</button>
                     <h3>Move ${hostname}</h3>
                     <p>Current group: <strong>${currentGroup}</strong></p>
-                    <select id="groupSelect" style="width:100%;padding:8px;margin:10px 0">
+                    <select id="groupSelect" style="width:100%;padding:8px;margin:10px 0;background:var(--card-bg);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px">
                         ${options}
                     </select>
                     <div style="text-align:right;margin-top:15px">
@@ -1069,6 +1100,227 @@
                 }
             }
         });
+        
+        async function showMetricGraph(machineId, metricType, hostname) {
+            // Store for modal refresh
+            window.currentMachineId = machineId;
+            window.currentMetricType = metricType;
+            
+            try {
+                const response = await fetch(`/api/metrics/${machineId}`);
+                const metrics = await response.json();
+                
+                if (metrics.error) {
+                    console.error('Failed to load metrics:', metrics.error);
+                    return;
+                }
+                
+                // Prepare data based on metric type
+                const labels = metrics.map(m => new Date(m.timestamp).toLocaleString());
+                let data, label, color;
+                
+                switch(metricType) {
+                    case 'cpu':
+                        data = metrics.map(m => m.cpu_percent);
+                        label = 'CPU Usage (%)';
+                        color = '#ff9800';
+                        break;
+                    case 'memory':
+                        data = metrics.map(m => m.memory_percent);
+                        label = 'Memory Usage (%)';
+                        color = '#4caf50';
+                        break;
+                    case 'disk':
+                        data = metrics.map(m => m.disk_percent);
+                        label = 'Disk Usage (%)';
+                        color = '#f44336';
+                        break;
+                    case 'process':
+                        data = metrics.map(m => m.process_count);
+                        label = 'Process Count';
+                        color = '#2196f3';
+                        break;
+                }
+                
+                // Show modal with graph
+                showGraphModal(hostname, label, labels, data, color);
+                
+            } catch (error) {
+                console.error('Failed to load metric graph:', error);
+            }
+        }
+        
+        function showGraphModal(hostname, label, labels, data, color) {
+            // Create modal
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000';
+            modal.innerHTML = `
+                <div style="background:var(--card-bg);padding:20px;border-radius:8px;width:80%;max-width:800px;max-height:80vh;overflow-y:auto;position:relative">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+                        <h3 style="color:var(--text-color);margin:0">${hostname} - ${label} (Last 24 Hours)</h3>
+                        <div>
+                            <button style="background:#4caf50;color:white;border:none;padding:8px 12px;border-radius:4px;margin-right:10px;cursor:pointer">Refresh</button>
+                            <button id="realtimeBtn" style="background:#2196f3;color:white;border:none;padding:8px 12px;border-radius:4px;margin-right:10px;cursor:pointer">Real-time: OFF</button>
+                            <button id="closeBtn" style="background:#f44336;color:white;border:none;padding:8px 12px;border-radius:4px;cursor:pointer">Close</button>
+                        </div>
+                    </div>
+                    <canvas id="modalChart" style="max-height:400px;width:100%"></canvas>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Store modal reference
+            window.currentModalElement = modal;
+            
+            // Add event listeners
+            modal.querySelector('#closeBtn').addEventListener('click', closeGraphModal);
+            modal.querySelector('button[style*="#4caf50"]').addEventListener('click', refreshGraph);
+            modal.querySelector('#realtimeBtn').addEventListener('click', toggleRealtime);
+            
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeGraphModal();
+            });
+            document.body.appendChild(modal);
+            
+            // Store modal data for refresh/realtime
+            window.currentModal = {
+                hostname,
+                label,
+                color,
+                machineId: window.currentMachineId,
+                metricType: window.currentMetricType,
+                isRealtime: false,
+                interval: null
+            };
+            
+            // Create chart
+            createModalChart(labels, data, label, color);
+        }
+        
+        function createModalChart(labels, data, label, color) {
+            const canvas = document.getElementById('modalChart');
+            if (!canvas) return;
+            
+            // Destroy existing chart
+            if (window.modalChart && typeof window.modalChart.destroy === 'function') {
+                window.modalChart.destroy();
+            }
+            
+            const ctx = canvas.getContext('2d');
+            window.modalChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: label.includes('%') ? 100 : undefined
+                        },
+                        x: {
+                            display: false
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        },
+                        tooltip: {
+                            enabled: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        async function refreshGraph() {
+            if (!window.currentModal) return;
+            
+            try {
+                const response = await fetch(`/api/metrics/${window.currentModal.machineId}`);
+                const metrics = await response.json();
+                
+                if (metrics.error) {
+                    console.error('Metrics error:', metrics.error);
+                    return;
+                }
+                
+                if (!metrics || metrics.length === 0) {
+                    console.log('No metrics data available');
+                    return;
+                }
+                
+                const labels = metrics.map(m => new Date(m.timestamp).toLocaleString());
+                let data;
+                
+                switch(window.currentModal.metricType) {
+                    case 'cpu': data = metrics.map(m => m.cpu_percent); break;
+                    case 'memory': data = metrics.map(m => m.memory_percent); break;
+                    case 'disk': data = metrics.map(m => m.disk_percent); break;
+                    case 'process': data = metrics.map(m => m.process_count); break;
+                }
+                
+                createModalChart(labels, data, window.currentModal.label, window.currentModal.color);
+            } catch (error) {
+                console.error('Failed to refresh graph:', error);
+            }
+        }
+        
+        function toggleRealtime() {
+            if (!window.currentModal) return;
+            
+            const btn = document.getElementById('realtimeBtn');
+            
+            if (window.currentModal.isRealtime) {
+                // Turn off real-time
+                clearInterval(window.currentModal.interval);
+                window.currentModal.isRealtime = false;
+                btn.textContent = 'Real-time: OFF';
+                btn.style.background = '#2196f3';
+            } else {
+                // Turn on real-time
+                window.currentModal.isRealtime = true;
+                btn.textContent = 'Real-time: ON';
+                btn.style.background = '#ff9800';
+                
+                // Refresh every 10 seconds
+                window.currentModal.interval = setInterval(refreshGraph, 10000);
+            }
+        }
+        
+        function closeGraphModal() {
+            // Clean up real-time interval
+            if (window.currentModal?.interval) {
+                clearInterval(window.currentModal.interval);
+            }
+            
+            // Destroy chart
+            if (window.modalChart && typeof window.modalChart.destroy === 'function') {
+                window.modalChart.destroy();
+                window.modalChart = null;
+            }
+            
+            // Remove modal using stored reference
+            if (window.currentModalElement) {
+                window.currentModalElement.remove();
+                window.currentModalElement = null;
+            }
+            
+            window.currentModal = null;
+        }
         
         // Auto-refresh every 10 seconds (slower to reduce interference)
         setInterval(() => {

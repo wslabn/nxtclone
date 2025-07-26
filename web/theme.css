@@ -1,0 +1,59 @@
+:root {
+    --bg-color: #f5f5f5;
+    --card-bg: white;
+    --text-color: #333;
+    --label-color: #555;
+    --border-color: #ddd;
+    --shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --info-card-bg: #f8f9fa;
+    --metric-bg: #e3f2fd;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #1e1e1e;
+        --card-bg: #252526;
+        --text-color: #cccccc;
+        --label-color: #cccccc;
+        --border-color: #3c3c3c;
+        --shadow: 0 2px 4px rgba(0,0,0,0.5);
+        --info-card-bg: #2d2d30;
+        --metric-bg: #37373d;
+    }
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+}
+
+.card {
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin: 20px 0;
+}
+
+input[type="text"], input[type="password"], input[type="url"], select {
+    background: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 8px;
+}
+
+button {
+    background: #007cba;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #005a87;
+}

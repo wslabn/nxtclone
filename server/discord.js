@@ -79,6 +79,26 @@ class DiscordNotifier {
       0xffa500
     );
   }
+  
+  async sendProactiveAlert(message) {
+    if (!this.webhookUrl) return false;
+    
+    try {
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          content: message,
+          username: 'SysWatch Alerts'
+        })
+      });
+      
+      return response.ok;
+    } catch (error) {
+      console.error('Discord proactive alert failed:', error);
+      return false;
+    }
+  }
 }
 
 module.exports = DiscordNotifier;

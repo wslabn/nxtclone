@@ -3,14 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RMM Login</title>
+    <title>SysWatch Login</title>
+    <link rel="stylesheet" href="/theme.css">
     <style>
-        body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 300px; }
-        .login-container h2 { text-align: center; margin-bottom: 30px; color: #333; }
+        :root {
+            --bg-color: #f5f5f5;
+            --card-bg: white;
+            --text-color: #333;
+            --label-color: #555;
+            --border-color: #ddd;
+            --shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1e1e1e;
+                --card-bg: #252526;
+                --text-color: #cccccc;
+                --label-color: #cccccc;
+                --border-color: #3c3c3c;
+                --shadow: 0 4px 8px rgba(0,0,0,0.5);
+            }
+        }
+        
+        body { font-family: Arial, sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-container { background: var(--card-bg); padding: 40px; border-radius: 8px; box-shadow: var(--shadow); width: 300px; }
+        .login-container h2 { text-align: center; margin-bottom: 30px; color: var(--text-color); }
         .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 5px; color: #555; }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .form-group label { display: block; margin-bottom: 5px; color: var(--label-color); }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; background: var(--card-bg); color: var(--text-color); }
         .login-btn { width: 100%; padding: 12px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
         .login-btn:hover { background: #005a87; }
         .error { color: #f44336; text-align: center; margin-top: 10px; }
@@ -18,7 +39,7 @@
 </head>
 <body>
     <div class="login-container">
-        <h2>RMM Dashboard</h2>
+        <h2>SysWatch Dashboard</h2>
         <form id="loginForm">
             <div class="form-group">
                 <label for="username">Username:</label>

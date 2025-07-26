@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 class AgentUpdater:
-    def __init__(self, repo_owner="your-username", repo_name="nxtclone"):
+    def __init__(self, repo_owner="wslabn", repo_name="nxtclone"):
         self.repo_owner = repo_owner
         self.repo_name = repo_name
         self.current_version = self.get_current_version()

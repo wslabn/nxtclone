@@ -25,6 +25,7 @@ class RMMServer {
     this.setupWebSocket();
     this.startHeartbeatCheck();
     this.startUpdateCheck();
+    this.startTrendAnalysis();
   }
 
   setupRoutes() {
@@ -55,8 +56,17 @@ class RMMServer {
       res.json({ success: true });
     });
     
-    this.app.get('/admin', this.auth.requireAdmin.bind(this.auth), (req, res) => {
-      res.sendFile(path.join(__dirname, '../web/admin.html'));
+    this.app.get('/admin', (req, res) => {
+      const sessionId = req.cookies?.session;
+      const user = sessionId && this.auth.sessions.get(sessionId);
+      
+      if (!user) {
+        res.redirect('/login');
+      } else if (user.role !== 'admin') {
+        res.status(403).json({ error: 'Admin access required' });
+      } else {
+        res.sendFile(path.join(__dirname, '../web/admin.html'));
+      }
     });
     
     this.app.post('/api/change-password', this.auth.requireAuth.bind(this.auth), (req, res) => {
@@ -102,6 +112,16 @@ class RMMServer {
       res.json({ success: true });
     });
     
+    // Default route - redirect to login if not authenticated
+    this.app.get('/', (req, res) => {
+      const sessionId = req.cookies?.session;
+      if (sessionId && this.auth.sessions.has(sessionId)) {
+        res.sendFile(path.join(__dirname, '../web/index.html'));
+      } else {
+        res.redirect('/login');
+      }
+    });
+    
     // Protected routes
     this.app.use('/', (req, res, next) => {
       if (req.path === '/login' || req.path === '/api/login') {
@@ -113,8 +133,12 @@ class RMMServer {
     this.app.use(express.static(path.join(__dirname, '../web')));
 
     // Protected API endpoints
-    this.app.get('/api/machines', (req, res) => {
-      const machines = Array.from(this.clients.values()).map(client => ({
+    this.app.get('/api/machines', async (req, res) => {
+      const now = Date.now();
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      
+      // Get machines from memory (current connections)
+      const memoryMachines = Array.from(this.clients.values()).map(client => ({
         id: client.id,
         hostname: client.hostname,
         platform: client.platform,
@@ -124,7 +148,68 @@ class RMMServer {
         agentVersion: client.agentVersion || 'Unknown',
         metrics: client.metrics || {}
       }));
-      res.json(machines);
+      
+      // Get machines from database (last 24 hours)
+      const dbMachines = await this.db.getMachinesLastSeen(twentyFourHours);
+      
+      // Merge and deduplicate (memory takes precedence)
+      const machineMap = new Map();
+      
+      // Add database machines first
+      dbMachines.forEach(machine => {
+        machineMap.set(machine.hostname, {
+          id: machine.hostname,
+          hostname: machine.hostname,
+          platform: machine.platform,
+          lastSeen: machine.last_seen,
+          status: (now - machine.last_seen) > 30000 ? 'offline' : 'online',
+          systemInfo: machine.system_info ? JSON.parse(machine.system_info) : {},
+          agentVersion: machine.agent_version || 'Unknown',
+          metrics: {}
+        });
+      });
+      
+      // Override with memory machines (current connections) but preserve lastSeen for offline
+      memoryMachines.forEach(machine => {
+        const existing = machineMap.get(machine.hostname);
+        if (machine.status === 'offline' && existing && existing.lastSeen > machine.lastSeen) {
+          // Keep the more recent lastSeen from database for offline machines
+          machine.lastSeen = existing.lastSeen;
+        }
+        machineMap.set(machine.hostname, machine);
+      });
+      
+      res.json(Array.from(machineMap.values()));
+    });
+    
+    this.app.get('/api/metrics/:machineId', async (req, res) => {
+      try {
+        const { machineId } = req.params;
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        const metrics = await this.db.getMetricsHistory(machineId, twentyFourHours);
+        res.json(metrics);
+      } catch (error) {
+        res.json({ error: error.message });
+      }
+    });
+    
+    this.app.get('/api/alerts', async (req, res) => {
+      try {
+        const alerts = await this.db.getActiveAlerts();
+        res.json(alerts);
+      } catch (error) {
+        res.json({ error: error.message });
+      }
+    });
+    
+    this.app.get('/api/alerts/:machineId', async (req, res) => {
+      try {
+        const { machineId } = req.params;
+        const alerts = await this.db.getActiveAlerts(machineId);
+        res.json(alerts);
+      } catch (error) {
+        res.json({ error: error.message });
+      }
     });
 
     this.app.post('/api/cleanup-offline', (req, res) => {
@@ -318,6 +403,12 @@ class RMMServer {
             }
             
             client.metrics = metrics;
+            
+            // Store metrics in database for historical tracking
+            this.db.storeMetrics(client.id, metrics);
+            
+            // Check for immediate anomalies
+            this.checkMetricAnomalies(client.id, client.hostname, metrics);
             break;
           }
         }
@@ -356,6 +447,8 @@ class RMMServer {
       for (const client of this.clients.values()) {
         if (now - client.lastSeen > timeout && client.status === 'online') {
           client.status = 'offline';
+          // Update database with current offline time
+          this.db.updateMachine(client.id, client.hostname, client.platform, 'offline', client.systemInfo);
           console.log(`ALERT: Machine ${client.hostname} went offline`);
           const group = this.getMachineGroup(client.hostname);
           this.discord.machineOffline(client.hostname, group);
@@ -392,6 +485,91 @@ class RMMServer {
       }
     }
     return 'Unknown';
+  }
+  
+  startTrendAnalysis() {
+    // Run trend analysis every 30 minutes
+    setInterval(async () => {
+      console.log('Running trend analysis...');
+      
+      for (const client of this.clients.values()) {
+        if (client.status === 'online') {
+          await this.analyzeTrends(client.id, client.hostname);
+        }
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+  }
+  
+  async checkMetricAnomalies(machineId, hostname, currentMetrics) {
+    try {
+      // Get baseline for comparison
+      const cpuBaseline = await this.db.calculateBaseline(machineId, 'cpu_percent');
+      const memoryBaseline = await this.db.calculateBaseline(machineId, 'memory_percent');
+      const diskBaseline = await this.db.calculateBaseline(machineId, 'disk_percent');
+      
+      // Check for significant deviations (3x baseline average)
+      if (cpuBaseline.avg && currentMetrics.cpu_percent > cpuBaseline.avg * 3) {
+        this.db.storeAlert(machineId, 'anomaly', 'warning', 
+          `CPU usage (${currentMetrics.cpu_percent.toFixed(1)}%) is 3x higher than baseline (${cpuBaseline.avg.toFixed(1)}%)`,
+          { current: currentMetrics.cpu_percent, baseline: cpuBaseline.avg }
+        );
+        
+        const group = this.getMachineGroup(hostname);
+        this.discord.sendProactiveAlert(`🚨 **CPU Anomaly**: ${hostname} CPU at ${currentMetrics.cpu_percent.toFixed(1)}% (baseline: ${cpuBaseline.avg.toFixed(1)}%) [${group}]`);
+      }
+      
+      if (memoryBaseline.avg && currentMetrics.memory_percent > memoryBaseline.avg * 2.5) {
+        this.db.storeAlert(machineId, 'anomaly', 'warning',
+          `Memory usage (${currentMetrics.memory_percent.toFixed(1)}%) is significantly higher than baseline (${memoryBaseline.avg.toFixed(1)}%)`,
+          { current: currentMetrics.memory_percent, baseline: memoryBaseline.avg }
+        );
+        
+        const group = this.getMachineGroup(hostname);
+        this.discord.sendProactiveAlert(`🧠 **Memory Anomaly**: ${hostname} Memory at ${currentMetrics.memory_percent.toFixed(1)}% (baseline: ${memoryBaseline.avg.toFixed(1)}%) [${group}]`);
+      }
+      
+    } catch (error) {
+      console.error('Error checking metric anomalies:', error);
+    }
+  }
+  
+  async analyzeTrends(machineId, hostname) {
+    try {
+      // Analyze disk space trend for predictive alerts
+      const diskTrend = await this.db.getTrend(machineId, 'disk_percent', 48);
+      
+      if (diskTrend.slope > 0.5 && diskTrend.dataPoints > 10) {
+        // Disk usage increasing significantly
+        const daysUntilFull = diskTrend.prediction > 95 ? 
+          Math.ceil((95 - diskTrend.prediction) / (diskTrend.slope * 24 * 6)) : null;
+        
+        if (daysUntilFull && daysUntilFull < 7) {
+          this.db.storeAlert(machineId, 'predictive', 'critical',
+            `Disk space trending toward full - estimated ${daysUntilFull} days remaining`,
+            { trend: diskTrend, daysUntilFull }
+          );
+          
+          const group = this.getMachineGroup(hostname);
+          this.discord.sendProactiveAlert(`💾 **Disk Space Warning**: ${hostname} disk will be full in ~${daysUntilFull} days at current rate [${group}]`);
+        }
+      }
+      
+      // Analyze CPU performance degradation
+      const cpuTrend = await this.db.getTrend(machineId, 'cpu_percent', 24);
+      
+      if (cpuTrend.slope > 1.0 && cpuTrend.dataPoints > 20) {
+        this.db.storeAlert(machineId, 'trend', 'warning',
+          `CPU usage trending upward - ${(cpuTrend.slope * 24).toFixed(1)}% increase per day`,
+          { trend: cpuTrend }
+        );
+        
+        const group = this.getMachineGroup(hostname);
+        this.discord.sendProactiveAlert(`📈 **Performance Trend**: ${hostname} CPU usage increasing ${(cpuTrend.slope * 24).toFixed(1)}%/day [${group}]`);
+      }
+      
+    } catch (error) {
+      console.error('Error analyzing trends:', error);
+    }
   }
 
   start(port = 3000) {
