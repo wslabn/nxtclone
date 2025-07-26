@@ -92,7 +92,7 @@ class AgentUpdater:
                 # Copy new agent files
                 if os.path.exists(source_dir):
                     for file in os.listdir(source_dir):
-                        if file.endswith('.py'):
+                        if file.endswith('.py') or file == 'version.txt':
                             src = os.path.join(source_dir, file)
                             dst = current_dir / file
                             shutil.copy2(src, dst)

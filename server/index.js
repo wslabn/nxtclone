@@ -21,11 +21,47 @@ class RMMServer {
     this.discord = new DiscordNotifier();
     this.groups = new Map(); // Store groups from web clients
     
+    // Initialize log storage
+    global.serverLogs = global.serverLogs || [];
+    this.setupLogging();
+    
     this.setupRoutes();
     this.setupWebSocket();
     this.startHeartbeatCheck();
     this.startUpdateCheck();
     this.startTrendAnalysis();
+  }
+  
+  setupLogging() {
+    // Capture console.log messages
+    const originalLog = console.log;
+    console.log = (...args) => {
+      const timestamp = new Date().toISOString();
+      const message = args.join(' ');
+      
+      // Store in memory (keep last 200 entries)
+      global.serverLogs.push({ timestamp, message, level: 'info' });
+      if (global.serverLogs.length > 200) {
+        global.serverLogs.shift();
+      }
+      
+      // Call original console.log
+      originalLog.apply(console, args);
+    };
+    
+    // Capture console.error messages
+    const originalError = console.error;
+    console.error = (...args) => {
+      const timestamp = new Date().toISOString();
+      const message = args.join(' ');
+      
+      global.serverLogs.push({ timestamp, message, level: 'error' });
+      if (global.serverLogs.length > 200) {
+        global.serverLogs.shift();
+      }
+      
+      originalError.apply(console, args);
+    };
   }
 
   setupRoutes() {
@@ -207,6 +243,16 @@ class RMMServer {
         const { machineId } = req.params;
         const alerts = await this.db.getActiveAlerts(machineId);
         res.json(alerts);
+      } catch (error) {
+        res.json({ error: error.message });
+      }
+    });
+    
+    this.app.get('/api/logs', (req, res) => {
+      try {
+        // Get recent console logs (stored in memory)
+        const logs = global.serverLogs || [];
+        res.json({ logs: logs.slice(-100) }); // Last 100 log entries
       } catch (error) {
         res.json({ error: error.message });
       }
@@ -435,6 +481,19 @@ class RMMServer {
           error: message.error,
           timestamp: Date.now()
         });
+        break;
+        
+      case 'agent_log':
+        console.log(`[${message.hostname}] ${message.message}`);
+        // Store agent log in server logs
+        global.serverLogs.push({
+          timestamp: new Date().toISOString(),
+          message: `[${message.hostname}] ${message.message}`,
+          level: 'info'
+        });
+        if (global.serverLogs.length > 200) {
+          global.serverLogs.shift();
+        }
         break;
     }
   }

@@ -101,6 +101,14 @@
         </div>
         
         <div class="card">
+            <h2>Server Logs</h2>
+            <button onclick="viewLogs()" style="margin-bottom: 15px;">View Update Logs</button>
+            <div id="logsContainer" style="display: none;">
+                <div id="logsList" style="background: var(--info-card-bg); padding: 15px; border-radius: 4px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
+            </div>
+        </div>
+        
+        <div class="card">
             <h2>Users</h2>
             <div id="usersList" class="user-list"></div>
         </div>
@@ -226,6 +234,37 @@
                 message.innerHTML = `<div class="error">Error: ${error.message}</div>`;
             }
         });
+        
+        async function viewLogs() {
+            const container = document.getElementById('logsContainer');
+            const logsList = document.getElementById('logsList');
+            
+            try {
+                const response = await fetch('/api/logs');
+                const data = await response.json();
+                
+                if (data.logs) {
+                    const logsHtml = data.logs.map(log => {
+                        const time = new Date(log.timestamp).toLocaleString();
+                        const levelColor = log.level === 'error' ? '#f44336' : '#4caf50';
+                        return `<div style="margin: 5px 0; color: var(--text-color);">
+                            <span style="color: #666;">[${time}]</span> 
+                            <span style="color: ${levelColor}; font-weight: bold;">[${log.level.toUpperCase()}]</span> 
+                            ${log.message}
+                        </div>`;
+                    }).reverse().join('');
+                    
+                    logsList.innerHTML = logsHtml || '<div style="color: #666;">No logs available</div>';
+                    container.style.display = container.style.display === 'none' ? 'block' : 'none';
+                } else {
+                    logsList.innerHTML = `<div style="color: #f44336;">Error: ${data.error}</div>`;
+                    container.style.display = 'block';
+                }
+            } catch (error) {
+                logsList.innerHTML = `<div style="color: #f44336;">Failed to load logs: ${error.message}</div>`;
+                container.style.display = 'block';
+            }
+        }
         
         loadUsers();
     </script>
