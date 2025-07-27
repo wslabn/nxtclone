@@ -112,7 +112,8 @@ Section "install"
     Sleep 2000
     
     # Store server URL in registry for persistence
-    WriteRegStr HKLM "SOFTWARE\SysWatch" "ServerURL" '$ServerUrl'
+    StrCpy $3 $ServerUrl
+    WriteRegStr HKLM "SOFTWARE\SysWatch" "ServerURL" $3
     
     # Create the service with the provided server URL
     ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\syswatch-agent-windows.exe\" $ServerUrl" start= auto DisplayName= "${APPNAME}"' $0
