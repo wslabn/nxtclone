@@ -25,6 +25,15 @@ def build_linux_agent():
     ])
     
     print("Linux control app built successfully!")
+    
+    # Create installer
+    try:
+        import subprocess
+        subprocess.run(['chmod', '+x', 'create-linux-installer.sh'], check=True)
+        subprocess.run(['./create-linux-installer.sh'], check=True)
+        print("Linux installer created successfully!")
+    except Exception as e:
+        print(f"Warning: Linux installer creation failed: {e}")
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))

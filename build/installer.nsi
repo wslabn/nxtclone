@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 13
+!define VERSIONBUILD 14
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
