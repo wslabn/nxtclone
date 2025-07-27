@@ -426,17 +426,22 @@ class RMMServer {
           hostname: message.hostname,
           platform: message.platform,
           systemInfo: message.system_info || {},
-          agentVersion: message.agent_version || 'Unknown',
+          agentVersion: message.agentVersion || 'Unknown',
           metrics: {},
           lastSeen: Date.now(),
           status: 'online'
         };
         
         this.clients.set(clientId, client);
-        console.log(`Machine registered: ${message.hostname} (${message.platform}) - Agent v${message.agent_version || 'Unknown'}`);
+        console.log(`Machine registered: ${message.hostname} (${message.platform}) - Agent v${message.agentVersion || 'Unknown'}`);
         
-        // Store in database
-        this.db.updateMachine(clientId, message.hostname, message.platform, 'online', message.system_info);
+        // Store in database with agent version
+        this.db.updateMachine(clientId, message.hostname, message.platform, 'online', message.system_info, message.agentVersion);
+        
+        // If no version provided, try to get it via command
+        if (!message.agentVersion || message.agentVersion === 'Unknown') {
+          this.getAgentVersion(client);
+        }
         
         ws.send(JSON.stringify({
           type: 'registered',
@@ -478,6 +483,19 @@ class RMMServer {
 
       case 'command_result':
         console.log(`Command result from ${message.hostname}:`, message.result);
+        
+        // Check if this is a version command response
+        const machineClient = Array.from(this.clients.values()).find(c => c.hostname === message.hostname);
+        if (machineClient && machineClient.versionCommandId === message.id) {
+          const version = message.result.stdout?.trim() || 'Unknown';
+          if (version !== 'Unknown' && version !== '') {
+            machineClient.agentVersion = version;
+            this.db.updateMachine(machineClient.id, machineClient.hostname, machineClient.platform, machineClient.status, machineClient.systemInfo, version);
+            console.log(`Updated agent version for ${message.hostname}: ${version}`);
+          }
+          delete machineClient.versionCommandId;
+        }
+        
         // Store result for web client retrieval
         global.commandResults = global.commandResults || new Map();
         global.commandResults.set(message.id, {
@@ -565,6 +583,25 @@ class RMMServer {
       }
     }
     return 'Unknown';
+  }
+  
+  getAgentVersion(client) {
+    if (client.ws.readyState !== WebSocket.OPEN) return;
+    
+    const isWindows = client.platform.includes('Windows');
+    const versionCommand = isWindows ? 
+      'type "C:\\Program Files\\SysWatch\\version.txt" 2>nul || type "C:\\Program Files (x86)\\SysWatch\\version.txt" 2>nul || echo Unknown' :
+      'cat /opt/syswatch/version.txt 2>/dev/null || echo Unknown';
+    
+    const commandId = uuidv4();
+    client.ws.send(JSON.stringify({
+      type: 'command',
+      id: commandId,
+      command: versionCommand
+    }));
+    
+    // Store command ID to identify version response
+    client.versionCommandId = commandId;
   }
   
   startTrendAnalysis() {

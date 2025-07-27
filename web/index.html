@@ -315,9 +315,6 @@
                         <button onclick="quickAction('${machine.id}', 'software')" 
                                 ${machine.status === 'offline' ? 'disabled' : ''} 
                                 style="background: #607d8b; margin-right: 5px;">Software</button>
-                        <button onclick="quickAction('${machine.id}', 'version')" 
-                                ${machine.status === 'offline' ? 'disabled' : ''} 
-                                style="background: #795548; margin-right: 5px;">Version</button>
                         <button onclick="updateSingleAgent('${machine.id}')" 
                                 ${machine.status === 'offline' ? 'disabled' : ''} 
                                 style="background: #ff5722; margin-right: 5px;">Update</button>
@@ -727,10 +724,7 @@
                     'Windows': 'wmic product get name,version /format:table',
                     'Linux': 'dpkg -l | head -20'
                 },
-                'version': {
-                    'Windows': 'echo Agent Version: && type "C:\\Program Files\\NxtClone\\NxtClone Agent\\version.txt" 2>nul || type "C:\\Program Files (x86)\\NxtClone\\NxtClone Agent\\version.txt" 2>nul || echo "Version file not found - please update agent"',
-                    'Linux': 'echo "Agent Version:" && cat /opt/nxtclone/version.txt 2>/dev/null || echo "Version file not found - please update agent"'
-                }
+
             };
             
             const machine = machines.find(m => m.id === machineId);

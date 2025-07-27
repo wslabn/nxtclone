@@ -68,7 +68,8 @@ class WindowsAgent:
             "type": "register",
             "hostname": self.hostname,
             "platform": self.platform,
-            "system_info": system_info
+            "system_info": system_info,
+            "agentVersion": "Unknown"
         }
         await websocket.send(json.dumps(register_msg))
         print(f"Registered as {self.hostname} ({self.platform})")

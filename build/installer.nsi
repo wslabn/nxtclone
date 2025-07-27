@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 8
+!define VERSIONBUILD 9
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -68,10 +68,10 @@ Section "install"
     SetOutPath $INSTDIR
     
     # Copy the agent executable
-    File "dist\syswatch-agent.exe"
+    File "dist\syswatch-agent-windows.exe"
     
     # Verify file was copied
-    IfFileExists "$INSTDIR\syswatch-agent.exe" +2 0
+    IfFileExists "$INSTDIR\syswatch-agent-windows.exe" +2 0
     MessageBox MB_OK "Error: Agent executable not found after copy!"
     
     # Stop existing service if running
@@ -79,7 +79,7 @@ Section "install"
     ExecWait 'sc delete "${APPNAME}"'
     
     # Create the service with the provided server URL
-    ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\syswatch-agent.exe\" $ServerUrl" start= auto'
+    ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\syswatch-agent-windows.exe\" $ServerUrl" start= auto'
     
     # Don't start service automatically - let user start it manually
     # ExecWait 'sc start "${APPNAME}"'
@@ -113,7 +113,7 @@ Section "uninstall"
     ExecWait 'sc delete "${APPNAME}"'
     
     # Remove files
-    Delete "$INSTDIR\syswatch-agent.exe"
+    Delete "$INSTDIR\syswatch-agent-windows.exe"
     Delete "$INSTDIR\uninstall.exe"
     RMDir "$INSTDIR"
     

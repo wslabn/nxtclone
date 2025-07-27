@@ -17,6 +17,7 @@ class Database {
           system_info TEXT,
           last_seen INTEGER,
           status TEXT,
+          agent_version TEXT DEFAULT 'Unknown',
           created_at INTEGER DEFAULT (strftime('%s', 'now'))
         )
       `);
@@ -65,18 +66,25 @@ class Database {
       
       this.db.run(`CREATE INDEX IF NOT EXISTS idx_alerts_machine_time ON alerts (machine_id, timestamp)`);
       
+      // Add agent_version column if it doesn't exist (migration)
+      this.db.run(`ALTER TABLE machines ADD COLUMN agent_version TEXT DEFAULT 'Unknown'`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.error('Migration error:', err.message);
+        }
+      });
+      
       // Clean up old metrics (keep only 7 days)
       this.db.run(`DELETE FROM metrics WHERE timestamp < ?`, [Date.now() - (7 * 24 * 60 * 60 * 1000)]);
       this.db.run(`DELETE FROM alerts WHERE timestamp < ?`, [Date.now() - (7 * 24 * 60 * 60 * 1000)]);
     });
   }
 
-  updateMachine(id, hostname, platform, status, systemInfo = null) {
+  updateMachine(id, hostname, platform, status, systemInfo = null, agentVersion = 'Unknown') {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO machines (id, hostname, platform, system_info, last_seen, status)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO machines (id, hostname, platform, system_info, last_seen, status, agent_version)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    stmt.run(id, hostname, platform, systemInfo ? JSON.stringify(systemInfo) : null, Date.now(), status);
+    stmt.run(id, hostname, platform, systemInfo ? JSON.stringify(systemInfo) : null, Date.now(), status, agentVersion);
     stmt.finalize();
   }
 
