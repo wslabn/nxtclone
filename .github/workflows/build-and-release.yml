@@ -62,7 +62,7 @@ jobs:
       with:
         name: linux-executables
         path: |
-          build/dist/syswatch-agent
+          build/dist/syswatch-agent-linux
           build/dist/syswatch-control
           build/dist/syswatch-agent-installer-linux
   

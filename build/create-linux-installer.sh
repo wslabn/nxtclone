@@ -7,9 +7,9 @@ set -e
 echo "Creating single Linux installer..."
 
 # Check if agent executable exists
-if [ ! -f "dist/syswatch-agent" ]; then
-    echo "Error: dist/syswatch-agent not found"
-    echo "Run build-linux.sh first"
+if [ ! -f "dist/syswatch-agent-linux" ]; then
+    echo "Error: dist/syswatch-agent-linux not found"
+    echo "Run build-linux.py first"
     exit 1
 fi
 
@@ -18,9 +18,7 @@ TEMP_DIR=$(mktemp -d)
 mkdir -p "$TEMP_DIR/syswatch"
 
 # Copy agent files
-cp dist/syswatch-agent "$TEMP_DIR/syswatch/"
-# Rename for installer compatibility
-mv "$TEMP_DIR/syswatch/syswatch-agent" "$TEMP_DIR/syswatch/syswatch-agent-linux"
+cp dist/syswatch-agent-linux "$TEMP_DIR/syswatch/"
 
 # Copy control app if it exists
 if [ -f "dist/syswatch-control" ]; then

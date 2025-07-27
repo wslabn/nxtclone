@@ -8,7 +8,7 @@ def build_linux_agent():
     
     PyInstaller.__main__.run([
         '--onefile',
-        '--name=syswatch-agent',
+        '--name=syswatch-agent-linux',
         f'--add-data=../agents/version.txt{separator}.',
         f'--add-data=../agents/agent_updater.py{separator}.',
         '../agents/linux_agent.py'
