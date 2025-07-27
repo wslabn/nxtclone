@@ -50,5 +50,9 @@ chmod +x dist/syswatch-agent-installer-linux
 # Cleanup
 rm -rf "$TEMP_DIR"
 
+# Rename to expected installer filename
+mv dist/syswatch-agent-installer-linux dist/syswatch-agent-installer-linux-temp
+cp dist/syswatch-agent-installer-linux-temp dist/syswatch-agent-installer-linux
+
 echo "Created: dist/syswatch-agent-installer-linux"
 echo "Usage: sudo ./syswatch-agent-installer-linux ws://server:3000"

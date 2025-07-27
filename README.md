@@ -38,17 +38,26 @@ Server runs on http://localhost:3000
 ### 4. Install Agents
 
 **Windows:**
-1. Download `syswatch-agent-installer.exe` from [Releases](https://github.com/wslabn/nxtclone/releases)
-2. Run as administrator
-3. Enter server URL (e.g., `ws://192.168.1.100:3000`)
-4. Choose whether to install system tray control app
-5. Agent installs as Windows service and starts automatically
+```cmd
+# Download and run installer
+https://github.com/wslabn/nxtclone/releases/latest/download/syswatch-agent-installer.exe
+```
+1. Run as administrator
+2. Enter server URL (e.g., `ws://192.168.1.100:3000`)
+3. Choose whether to install system tray control app
+4. Agent installs as Windows service and starts automatically
 
 **Linux:**
-1. Download `syswatch-agent-installer-linux` from [Releases](https://github.com/wslabn/nxtclone/releases)
-2. Run: `sudo ./syswatch-agent-installer-linux ws://192.168.1.100:3000`
-3. Choose whether to install control application
-4. Agent installs as systemd service and starts automatically
+```bash
+# Download installer
+wget https://github.com/wslabn/nxtclone/releases/latest/download/syswatch-agent-installer-linux
+chmod +x syswatch-agent-installer-linux
+
+# Install with your server URL
+sudo ./syswatch-agent-installer-linux ws://192.168.1.100:3000
+```
+1. Choose whether to install control application
+2. Agent installs as systemd service and starts automatically
 
 **Manual Execution (Development):**
 ```bash
@@ -213,4 +222,4 @@ MIT License - see LICENSE file for details
 ## Project Stats
 - Total Code Files: 15
 - Last Updated: 2025-01-25
-- Current Version: 1.2.11
+- Current Version: 1.2.12

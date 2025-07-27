@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 11
+!define VERSIONBUILD 12
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -12,10 +12,10 @@
 !define INSTALLSIZE 10000
 
 RequestExecutionLevel admin
-InstallDir "$PROGRAMFILES64\${COMPANYNAME}\${APPNAME}"
+InstallDir "$PROGRAMFILES64\${COMPANYNAME}"
 Name "${APPNAME}"
 Icon "icon.ico"
-outFile "syswatch-agent-installer.exe"
+outFile "dist\syswatch-agent-installer.exe"
 
 !include LogicLib.nsh
 !include nsDialogs.nsh

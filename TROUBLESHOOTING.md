@@ -6,8 +6,9 @@
 
 **Error 1053 - Service won't start:**
 ```
-Solution: Ensure you're running installer as administrator
-Check: Service executable path is correct in Services.msc
+Solution: Fixed in v1.2.12+ - installer now uses correct paths
+For older versions: Check service path with 'sc qc "SysWatch Agent"'
+Manual fix: sc delete "SysWatch Agent" && sc create "SysWatch Agent" binPath="\"C:\Program Files\SysWatch\syswatch-agent-windows.exe\" ws://server:3000" start=auto
 ```
 
 **Installer fails to run:**
@@ -18,9 +19,10 @@ Check: Windows Defender/antivirus isn't blocking
 
 **Service installed but not connecting:**
 ```
-Check: Windows Firewall isn't blocking outbound connections
+Check: Service is actually running - sc query "SysWatch Agent"
 Verify: Server URL format is correct (ws://server:3000)
-Test: Try manual execution first: syswatch-agent-windows.exe ws://server:3000
+Test: Manual execution: "C:\Program Files\SysWatch\syswatch-agent-windows.exe" ws://server:3000
+Firewall: Ensure outbound connections on port 3000 allowed
 ```
 
 ### Linux Installer
@@ -225,15 +227,24 @@ ps aux
 
 **Tray icon not appearing:**
 ```
+Location: C:\Program Files\SysWatch\syswatch-tray.exe (if installed)
 Check: Windows notification area settings
-Run: syswatch-tray.exe manually to test
-Restart: Windows Explorer process
+Manual run: Right-click → "Run as administrator"
+Restart: Windows Explorer process if needed
+```
+
+**Tray app logs not opening:**
+```
+Solution: Tray opens Windows Event Viewer (correct behavior)
+Logs location: Event Viewer → Windows Logs → Application
+Filter by: Source = "SysWatch Agent"
+Note: Service must be running to generate logs
 ```
 
 **Can't change server URL:**
 ```
-Run as administrator: Right-click → "Run as administrator"
-Check: Registry permissions for current user
+Run tray as administrator for service control
+Config saved to: tray_config.json in install directory
 ```
 
 ### Linux Control App
@@ -344,8 +355,10 @@ sudo userdel syswatch
 - Admin panel → Logs section
 
 **Windows agent logs:**
-- Windows Event Viewer
-- Service logs in system events
+- Windows Event Viewer → Application logs
+- Filter by Source: "SysWatch Agent"
+- Tray app "View Logs" opens Event Viewer automatically
+- Service start/stop events in System logs
 
 **Linux agent logs:**
 ```bash
