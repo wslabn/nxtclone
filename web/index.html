@@ -865,7 +865,7 @@
         }
         
         async function refreshMetricGraph() {
-            if (!window.currentMetricModal) return;
+            if (!window.currentMetricModal || !window.metricChart) return;
             
             try {
                 const response = await fetch(`/api/metrics/${window.currentMetricModal.machineId}`);
@@ -881,6 +881,7 @@
                     case 'memory': data = metrics.map(m => m.memory_percent); break;
                     case 'disk': data = metrics.map(m => m.disk_percent); break;
                     case 'process': data = metrics.map(m => m.process_count); break;
+                    default: return;
                 }
                 
                 // Update chart data
@@ -920,7 +921,7 @@
             modal.className = 'modal';
             modal.style.display = 'block';
             modal.innerHTML = `
-                <div class="modal-dialog" style="max-width: 800px; margin: 2rem auto;">
+                <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h3 class="modal-title">${hostname} - ${label} (Last 24 Hours)</h3>
@@ -931,7 +932,7 @@
                             </div>
                         </div>
                         <div class="modal-body">
-                            <canvas id="metricChart" style="max-height: 400px;"></canvas>
+                            <canvas id="metricChart" style="height: 500px;"></canvas>
                         </div>
                     </div>
                 </div>
@@ -954,6 +955,13 @@
                 interval: null
             };
             
+            // Get actual CSS color values
+            const getColor = (cssVar) => {
+                return getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+            };
+            
+            const actualColor = color.startsWith('var(') ? getColor(color.slice(4, -1)) : color;
+            
             // Create chart
             const ctx = document.getElementById('metricChart').getContext('2d');
             window.metricChart = new Chart(ctx, {
@@ -963,11 +971,14 @@
                     datasets: [{
                         label: label,
                         data: data,
-                        borderColor: color,
-                        backgroundColor: color + '20',
-                        borderWidth: 2,
+                        borderColor: actualColor,
+                        backgroundColor: actualColor + '20',
+                        borderWidth: 3,
                         fill: true,
-                        tension: 0.4
+                        tension: 0.4,
+                        pointBackgroundColor: actualColor,
+                        pointBorderColor: actualColor,
+                        pointRadius: 2
                     }]
                 },
                 options: {
@@ -976,7 +987,13 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            max: label.includes('%') ? 100 : undefined
+                            max: label.includes('%') ? 100 : undefined,
+                            grid: {
+                                color: getColor('--border')
+                            },
+                            ticks: {
+                                color: getColor('--text-secondary')
+                            }
                         },
                         x: {
                             display: false
@@ -984,7 +1001,10 @@
                     },
                     plugins: {
                         legend: {
-                            display: true
+                            display: true,
+                            labels: {
+                                color: getColor('--text-primary')
+                            }
                         }
                     }
                 }
