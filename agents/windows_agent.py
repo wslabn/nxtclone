@@ -159,13 +159,24 @@ class WindowsAgent:
             print(f"Executing command: {command}")
             
             try:
-                # Execute command with cmd
-                result = subprocess.run(
-                    ["cmd", "/c", command],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
+                # Handle PowerShell commands directly
+                if command.startswith('powershell'):
+                    # Extract PowerShell command
+                    ps_command = command.replace('powershell ', '').strip('"')
+                    result = subprocess.run(
+                        ["powershell.exe", "-ExecutionPolicy", "Bypass", "-Command", ps_command],
+                        capture_output=True,
+                        text=True,
+                        timeout=60
+                    )
+                else:
+                    # Execute regular command with cmd
+                    result = subprocess.run(
+                        ["cmd", "/c", command],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
                 
                 output = {
                     "stdout": result.stdout,

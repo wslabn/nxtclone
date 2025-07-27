@@ -732,7 +732,7 @@
                     'Linux': 'dpkg -l | head -20'
                 },
                 'winupdates': {
-                    'Windows': 'powershell -Command "Get-WUList | Select-Object Title, Size, Description | Format-Table -AutoSize"',
+                    'Windows': 'powershell "$Session = New-Object -ComObject Microsoft.Update.Session; $Searcher = $Session.CreateUpdateSearcher(); $SearchResult = $Searcher.Search(\"IsInstalled=0\"); if($SearchResult.Updates.Count -eq 0) { Write-Output \"No updates available\" } else { $SearchResult.Updates | Select-Object Title, Description, @{Name=\"Size\";Expression={[math]::Round($_.MaxDownloadSize/1MB,2)}} | Format-Table -AutoSize }"',
                     'Linux': 'echo "Windows Updates not available on Linux"'
                 },
 
