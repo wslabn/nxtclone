@@ -113,11 +113,8 @@ Section "install"
     # Wait for service deletion to complete
     Sleep 2000
     
-    # Create scheduled task to run at startup
-    ExecWait 'schtasks /create /tn "${APPNAME}" /tr "$INSTDIR\syswatch-agent-windows.exe $ServerUrl" /sc onstart /ru SYSTEM /f' $0
-    
-    # Start the service
-    ExecWait 'sc start "${APPNAME}"' $1
+    # Create scheduled task to run at startup as current user
+    ExecWait 'schtasks /create /tn "${APPNAME}" /tr "$INSTDIR\syswatch-agent-windows.exe $ServerUrl" /sc onstart /rl highest /f' $0
     
     # Check if service creation failed
     ${If} $0 != 0
@@ -144,17 +141,17 @@ Section "install"
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "NoRepair" 1
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "EstimatedSize" ${INSTALLSIZE}
     
-    # Show final message with service status
-    ${If} $1 == 0
-        StrCpy $2 "Service is running."
+    # Show final message
+    ${If} $0 == 0
+        StrCpy $2 "Task scheduled successfully. Agent will start on next boot."
     ${Else}
-        StrCpy $2 "Service failed to start - check Event Viewer."
+        StrCpy $2 "Task scheduling failed - agent may not start automatically."
     ${EndIf}
     
     ${If} $InstallTray == ${BST_CHECKED}
-        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent service: $2$\nTray app: Desktop shortcut created$\nServer: $ServerUrl"
+        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent: $2$\nTray app: Desktop shortcut created$\nServer: $ServerUrl"
     ${Else}
-        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent service: $2$\nServer: $ServerUrl"
+        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent: $2$\nServer: $ServerUrl"
     ${EndIf}
 SectionEnd
 
