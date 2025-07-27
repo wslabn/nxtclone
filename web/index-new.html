@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SysWatch Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-content">
+                <a href="/" class="navbar-brand">🖥️ SysWatch Dashboard</a>
+                <ul class="navbar-nav">
+                    <li><a href="/" class="nav-link active">Dashboard</a></li>
+                    <li><a href="/groups.html" class="nav-link">Groups</a></li>
+                    <li><a href="/admin" class="nav-link">Admin</a></li>
+                    <li><button onclick="logout()" class="btn btn-danger btn-sm">Logout</button></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Controls -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="flex flex-between flex-wrap">
+                    <div class="flex flex-wrap">
+                        <button onclick="checkForUpdates()" class="btn btn-primary">Check Updates</button>
+                        <button onclick="updateAllAgents()" class="btn btn-success">Update All</button>
+                        <button onclick="cleanupOfflineMachines()" class="btn btn-danger">Cleanup Offline</button>
+                        <button onclick="toggleView()" id="viewToggle" class="btn btn-info">Table View</button>
+                    </div>
+                    <div id="update-status" class="text-muted"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-4 mb-4" id="summary"></div>
+
+        <!-- Sidebar & Main Content -->
+        <div class="flex" style="gap: 2rem;">
+            <!-- Sidebar -->
+            <div style="width: 250px; flex-shrink: 0;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Machine Groups</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="group active cursor-pointer p-2 rounded mb-2" onclick="selectGroup('all')" style="background: var(--primary); color: white;">
+                            <div>All Machines</div>
+                            <div class="text-muted" id="all-count" style="color: rgba(255,255,255,0.8);">0 machines</div>
+                        </div>
+                        <div id="groups-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div style="flex: 1;">
+                <div id="machines"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Command Modal -->
+    <div id="commandModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="modalTitle">Command Output</h3>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="modalOutput" style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius); font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto;">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let machines = [];
+        let groups = {};
+        let selectedGroup = 'all';
+        let viewMode = 'cards';
+
+        // Machine management functions
+        async function uninstallAgent(machineId) {
+            const machine = machines.find(m => m.id === machineId);
+            if (!machine) return;
+            
+            if (!confirm(`Uninstall SysWatch agent from ${machine.hostname}?`)) return;
+            
+            try {
+                const response = await fetch('/api/uninstall-agent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert(`Uninstall command sent to ${machine.hostname}`);
+                    setTimeout(loadMachines, 3000);
+                } else {
+                    alert(`Failed: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function cleanupOfflineMachines() {
+            if (!confirm('Remove all offline machines?')) return;
+            
+            try {
+                const response = await fetch('/api/cleanup-offline', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert(`Removed ${result.count} offline machines`);
+                    loadMachines();
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function loadMachines() {
+            try {
+                const response = await fetch('/api/machines');
+                machines = await response.json();
+                renderMachines();
+            } catch (error) {
+                console.error('Failed to load machines:', error);
+            }
+        }
+
+        function toggleView() {
+            viewMode = viewMode === 'cards' ? 'table' : 'cards';
+            document.getElementById('viewToggle').textContent = viewMode === 'cards' ? 'Table View' : 'Card View';
+            renderMachines();
+        }
+
+        function renderMachines() {
+            renderSummary();
+            const container = document.getElementById('machines');
+            const filteredMachines = getFilteredMachines();
+            
+            if (viewMode === 'table') {
+                renderTableView(container, filteredMachines);
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            if (filteredMachines.length === 0) {
+                container.innerHTML = '<div class="card"><div class="card-body text-center text-muted">No machines in this group</div></div>';
+                return;
+            }
+
+            filteredMachines.forEach(machine => {
+                const machineCard = document.createElement('div');
+                machineCard.className = 'card mb-3';
+                machineCard.style.borderLeft = `4px solid ${machine.status === 'online' ? 'var(--success)' : 'var(--danger)'}`;
+                
+                const lastSeen = new Date(machine.lastSeen).toLocaleString();
+                
+                machineCard.innerHTML = `
+                    <div class="card-header">
+                        <div class="flex flex-between">
+                            <div>
+                                <h3 class="card-title">${machine.hostname}</h3>
+                                <div class="flex" style="align-items: center; gap: 0.5rem;">
+                                    <div class="status-dot status-${machine.status}"></div>
+                                    <span class="badge badge-${machine.status === 'online' ? 'success' : 'danger'}">${machine.status.toUpperCase()}</span>
+                                    <span class="text-muted">Last seen: ${lastSeen}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        ${renderSystemInfo(machine)}
+                        ${renderMetrics(machine)}
+                        ${renderQuickActions(machine)}
+                        ${renderCommandSection(machine)}
+                    </div>
+                `;
+                
+                container.appendChild(machineCard);
+            });
+        }
+
+        function renderSummary() {
+            const summary = document.getElementById('summary');
+            const online = machines.filter(m => m.status === 'online').length;
+            const offline = machines.length - online;
+            
+            summary.innerHTML = `
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div style="font-size: 2rem; font-weight: bold; color: var(--success);">${online}</div>
+                        <div class="text-muted">Online</div>
+                    </div>
+                </div>
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div style="font-size: 2rem; font-weight: bold; color: var(--danger);">${offline}</div>
+                        <div class="text-muted">Offline</div>
+                    </div>
+                </div>
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div style="font-size: 2rem; font-weight: bold;">${machines.length}</div>
+                        <div class="text-muted">Total</div>
+                    </div>
+                </div>
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div style="font-size: 2rem; font-weight: bold; color: var(--info);">${Object.keys(groups).length}</div>
+                        <div class="text-muted">Groups</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSystemInfo(machine) {
+            const info = machine.systemInfo || {};
+            if (!info.cpu_count) return '<p class="text-muted">System information not available</p>';
+            
+            return `
+                <div class="grid grid-3 mb-3">
+                    <div><strong>Platform:</strong> ${machine.platform}</div>
+                    <div><strong>CPU:</strong> ${info.cpu_count} cores</div>
+                    <div><strong>Memory:</strong> ${formatBytes(info.memory_total)}</div>
+                    <div><strong>Disk:</strong> ${formatBytes(info.disk_total)}</div>
+                    <div><strong>Architecture:</strong> ${info.architecture || 'Unknown'}</div>
+                    <div><strong>Agent:</strong> v${machine.agentVersion || 'Unknown'}</div>
+                </div>
+            `;
+        }
+
+        function renderMetrics(machine) {
+            const metrics = machine.metrics || {};
+            if (!metrics.cpu_percent) return '<p class="text-muted">No metrics available</p>';
+            
+            return `
+                <div class="grid grid-4 mb-3">
+                    <div class="cursor-pointer" onclick="showMetricGraph('${machine.id}', 'cpu', '${machine.hostname}')">
+                        <div class="text-muted mb-1">CPU Usage</div>
+                        <div style="font-weight: bold; margin-bottom: 0.5rem;">${metrics.cpu_percent.toFixed(1)}%</div>
+                        <div class="progress">
+                            <div class="progress-bar progress-cpu" style="width: ${metrics.cpu_percent}%"></div>
+                        </div>
+                    </div>
+                    <div class="cursor-pointer" onclick="showMetricGraph('${machine.id}', 'memory', '${machine.hostname}')">
+                        <div class="text-muted mb-1">Memory Usage</div>
+                        <div style="font-weight: bold; margin-bottom: 0.5rem;">${metrics.memory_percent.toFixed(1)}%</div>
+                        <div class="progress">
+                            <div class="progress-bar progress-memory" style="width: ${metrics.memory_percent}%"></div>
+                        </div>
+                    </div>
+                    <div class="cursor-pointer" onclick="showMetricGraph('${machine.id}', 'disk', '${machine.hostname}')">
+                        <div class="text-muted mb-1">Disk Usage</div>
+                        <div style="font-weight: bold; margin-bottom: 0.5rem;">${metrics.disk_percent.toFixed(1)}%</div>
+                        <div class="progress">
+                            <div class="progress-bar progress-disk" style="width: ${metrics.disk_percent}%"></div>
+                        </div>
+                    </div>
+                    <div class="cursor-pointer" onclick="showMetricGraph('${machine.id}', 'process', '${machine.hostname}')">
+                        <div class="text-muted mb-1">Processes</div>
+                        <div style="font-weight: bold;">${metrics.process_count}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderQuickActions(machine) {
+            const disabled = machine.status === 'offline';
+            const isWindows = machine.platform.includes('Windows');
+            
+            return `
+                <div class="flex flex-wrap mb-3">
+                    <button onclick="quickAction('${machine.id}', 'shutdown')" ${disabled ? 'disabled' : ''} class="btn btn-danger btn-sm">Shutdown</button>
+                    <button onclick="quickAction('${machine.id}', 'reboot')" ${disabled ? 'disabled' : ''} class="btn btn-warning btn-sm">Reboot</button>
+                    <button onclick="quickAction('${machine.id}', 'processes')" ${disabled ? 'disabled' : ''} class="btn btn-info btn-sm">Processes</button>
+                    <button onclick="quickAction('${machine.id}', 'services')" ${disabled ? 'disabled' : ''} class="btn btn-success btn-sm">Services</button>
+                    <button onclick="quickAction('${machine.id}', 'network')" ${disabled ? 'disabled' : ''} class="btn btn-secondary btn-sm">Network</button>
+                    <button onclick="quickAction('${machine.id}', 'software')" ${disabled ? 'disabled' : ''} class="btn btn-secondary btn-sm">Software</button>
+                    ${isWindows ? `<button onclick="quickAction('${machine.id}', 'winupdates')" ${disabled ? 'disabled' : ''} class="btn btn-info btn-sm">Win Updates</button>` : ''}
+                    <button onclick="updateSingleAgent('${machine.id}')" ${disabled ? 'disabled' : ''} class="btn btn-warning btn-sm">Update</button>
+                    <button onclick="uninstallAgent('${machine.id}')" ${disabled ? 'disabled' : ''} class="btn btn-danger btn-sm">Uninstall</button>
+                </div>
+            `;
+        }
+
+        function renderCommandSection(machine) {
+            const disabled = machine.status === 'offline';
+            
+            return `
+                <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+                    <div class="flex">
+                        <input type="text" id="cmd-${machine.id}" placeholder="Enter command..." class="form-input" ${disabled ? 'disabled' : ''} style="flex: 1; margin-right: 0.5rem;">
+                        <button onclick="executeCommand('${machine.id}')" ${disabled ? 'disabled' : ''} class="btn btn-primary">Execute</button>
+                    </div>
+                    <div id="result-${machine.id}" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius); font-family: monospace; white-space: pre-wrap;"></div>
+                </div>
+            `;
+        }
+
+        // Quick actions and command execution
+        function quickAction(machineId, action) {
+            const commands = {
+                'shutdown': {
+                    'Windows': 'shutdown /s /t 30 /c "Remote shutdown in 30 seconds"',
+                    'Linux': 'sudo shutdown -h +1 "Remote shutdown in 1 minute"'
+                },
+                'reboot': {
+                    'Windows': 'shutdown /r /t 30',
+                    'Linux': 'sudo reboot'
+                },
+                'processes': {
+                    'Windows': 'tasklist /fo table',
+                    'Linux': 'ps aux --sort=-%cpu | head -20'
+                },
+                'services': {
+                    'Windows': 'sc query state= all',
+                    'Linux': 'systemctl list-units --type=service --state=running'
+                },
+                'network': {
+                    'Windows': 'ipconfig /all && netstat -an | findstr LISTEN',
+                    'Linux': 'ip addr show && ss -tuln'
+                },
+                'software': {
+                    'Windows': 'wmic product get name,version /format:table',
+                    'Linux': 'dpkg -l | head -20'
+                },
+                'winupdates': {
+                    'Windows': 'powershell "$Session = New-Object -ComObject Microsoft.Update.Session; $Searcher = $Session.CreateUpdateSearcher(); $SearchResult = $Searcher.Search(\\"IsInstalled=0\\"); if($SearchResult.Updates.Count -eq 0) { Write-Output \\"No updates available\\" } else { $SearchResult.Updates | Select-Object Title, Description, @{Name=\\"Size\\";Expression={[math]::Round($_.MaxDownloadSize/1MB,2)}} | Format-Table -AutoSize }"',
+                    'Linux': 'echo "Windows Updates not available on Linux"'
+                }
+            };
+            
+            const machine = machines.find(m => m.id === machineId);
+            if (!machine) return;
+            
+            const platform = machine.platform.includes('Windows') ? 'Windows' : 'Linux';
+            const command = commands[action][platform];
+            
+            if (action === 'shutdown' || action === 'reboot') {
+                if (!confirm(`${action} ${machine.hostname}?`)) return;
+                executeCommandDirect(machineId, command, false);
+            } else {
+                executeCommandDirect(machineId, command, true);
+            }
+        }
+
+        async function executeCommand(machineId) {
+            const input = document.getElementById(`cmd-${machineId}`);
+            const command = input.value.trim();
+            if (!command) return;
+            
+            const machine = machines.find(m => m.id === machineId);
+            document.getElementById('modalTitle').textContent = `${machine.hostname} - ${command}`;
+            document.getElementById('modalOutput').textContent = 'Executing command...';
+            document.getElementById('commandModal').style.display = 'block';
+
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId, command })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    pollForCommandResult(result.commandId, machine.hostname);
+                    input.value = '';
+                } else {
+                    document.getElementById('modalOutput').textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                document.getElementById('modalOutput').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function executeCommandDirect(machineId, command, showInModal = false) {
+            const machine = machines.find(m => m.id === machineId);
+            
+            if (showInModal) {
+                document.getElementById('modalTitle').textContent = `${machine.hostname} - ${command}`;
+                document.getElementById('modalOutput').textContent = 'Executing command...';
+                document.getElementById('commandModal').style.display = 'block';
+            }
+            
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId, command })
+                });
+
+                const result = await response.json();
+                if (result.success && showInModal) {
+                    pollForCommandResult(result.commandId, machine.hostname);
+                } else if (!result.success) {
+                    if (showInModal) {
+                        document.getElementById('modalOutput').textContent = `Error: ${result.error}`;
+                    }
+                }
+            } catch (error) {
+                if (showInModal) {
+                    document.getElementById('modalOutput').textContent = `Error: ${error.message}`;
+                }
+            }
+        }
+
+        async function pollForCommandResult(commandId, hostname) {
+            let attempts = 0;
+            const maxAttempts = 20;
+            
+            const poll = async () => {
+                try {
+                    const response = await fetch(`/api/command-result/${commandId}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const result = data.result.result;
+                        let output = '';
+                        
+                        if (result.stdout) output += result.stdout;
+                        if (result.stderr) output += '\\n--- STDERR ---\\n' + result.stderr;
+                        if (result.error) output = 'Error: ' + result.error;
+                        if (result.returncode !== undefined) output += `\\n--- Exit Code: ${result.returncode} ---`;
+                        
+                        document.getElementById('modalOutput').textContent = output || 'No output';
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(poll, 500);
+                    } else {
+                        document.getElementById('modalOutput').textContent = 'Command timed out';
+                    }
+                } catch (error) {
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(poll, 500);
+                    } else {
+                        document.getElementById('modalOutput').textContent = 'Failed to retrieve result';
+                    }
+                }
+            };
+            
+            poll();
+        }
+
+        // Update functions
+        async function checkForUpdates() {
+            const status = document.getElementById('update-status');
+            status.textContent = 'Checking for updates...';
+            
+            try {
+                const response = await fetch('/api/update-check');
+                const result = await response.json();
+                
+                if (result.hasUpdate) {
+                    status.textContent = `Update available: ${result.currentVersion} -> ${result.latestVersion}`;
+                    status.className = 'text-warning';
+                } else {
+                    status.textContent = 'No updates available';
+                    status.className = 'text-success';
+                }
+            } catch (error) {
+                status.textContent = `Update check failed: ${error.message}`;
+                status.className = 'text-danger';
+            }
+        }
+
+        async function updateAllAgents() {
+            const status = document.getElementById('update-status');
+            status.textContent = 'Sending update request...';
+            
+            try {
+                const response = await fetch('/api/update-agents', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    status.textContent = `Update sent to ${result.agentsNotified} agents`;
+                    status.className = 'text-info';
+                } else {
+                    status.textContent = 'Failed to send update request';
+                    status.className = 'text-danger';
+                }
+            } catch (error) {
+                status.textContent = `Update failed: ${error.message}`;
+                status.className = 'text-danger';
+            }
+        }
+
+        async function updateSingleAgent(machineId) {
+            const machine = machines.find(m => m.id === machineId);
+            if (!machine || !confirm(`Update agent on ${machine.hostname}?`)) return;
+            
+            try {
+                const response = await fetch('/api/update-single-agent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Update request sent');
+                } else {
+                    alert(`Failed: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Utility functions
+        function formatBytes(bytes) {
+            if (!bytes) return 'Unknown';
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+        }
+
+        function selectGroup(groupName) {
+            selectedGroup = groupName;
+            document.querySelectorAll('.group').forEach(g => g.classList.remove('active'));
+            event.target.closest('.group').classList.add('active');
+            renderMachines();
+        }
+
+        function getFilteredMachines() {
+            if (selectedGroup === 'all') return machines;
+            return machines.filter(m => groups[selectedGroup]?.includes(m.hostname));
+        }
+
+        function renderTableView(container, filteredMachines) {
+            if (filteredMachines.length === 0) {
+                container.innerHTML = '<div class="card"><div class="card-body text-center text-muted">No machines in this group</div></div>';
+                return;
+            }
+            
+            const tableHtml = `
+                <div class="card">
+                    <div class="card-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Machine</th>
+                                    <th>Status</th>
+                                    <th>Platform</th>
+                                    <th>CPU</th>
+                                    <th>Memory</th>
+                                    <th>Disk</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${filteredMachines.map(machine => {
+                                    const metrics = machine.metrics || {};
+                                    const disabled = machine.status === 'offline';
+                                    
+                                    return `
+                                        <tr>
+                                            <td><strong>${machine.hostname}</strong></td>
+                                            <td>
+                                                <div class="flex" style="align-items: center; gap: 0.5rem;">
+                                                    <div class="status-dot status-${machine.status}"></div>
+                                                    <span class="badge badge-${machine.status === 'online' ? 'success' : 'danger'}">${machine.status}</span>
+                                                </div>
+                                            </td>
+                                            <td>${machine.platform}</td>
+                                            <td>${metrics.cpu_percent ? metrics.cpu_percent.toFixed(1) + '%' : 'N/A'}</td>
+                                            <td>${metrics.memory_percent ? metrics.memory_percent.toFixed(1) + '%' : 'N/A'}</td>
+                                            <td>${metrics.disk_percent ? metrics.disk_percent.toFixed(1) + '%' : 'N/A'}</td>
+                                            <td>
+                                                <div class="flex">
+                                                    <button onclick="quickAction('${machine.id}', 'processes')" ${disabled ? 'disabled' : ''} class="btn btn-info btn-sm">Proc</button>
+                                                    <button onclick="quickAction('${machine.id}', 'reboot')" ${disabled ? 'disabled' : ''} class="btn btn-warning btn-sm">Reboot</button>
+                                                    <button onclick="updateSingleAgent('${machine.id}')" ${disabled ? 'disabled' : ''} class="btn btn-success btn-sm">Update</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = tableHtml;
+        }
+
+        function closeModal() {
+            document.getElementById('commandModal').style.display = 'none';
+        }
+
+        function logout() {
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => {
+                    document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                    window.location.href = '/login';
+                });
+        }
+
+        // Placeholder functions for features not yet implemented
+        function showMetricGraph(machineId, metricType, hostname) {
+            alert('Metric graphs feature coming soon');
+        }
+
+        async function loadDatabaseGroups() {
+            groups = { 'Unknown': [] };
+        }
+
+        function renderGroups() {
+            // Simplified for now
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMachines();
+            loadDatabaseGroups();
+            
+            // Auto-refresh every 10 seconds
+            setInterval(loadMachines, 10000);
+            
+            // Close modal on outside click
+            window.onclick = function(event) {
+                const modal = document.getElementById('commandModal');
+                if (event.target === modal) {
+                    closeModal();
+                }
+            };
+        });
+    </script>
+</body>
+</html>
