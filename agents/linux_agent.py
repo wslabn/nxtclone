@@ -53,8 +53,8 @@ class LinuxAgent:
         while True:
             try:
                 # Check for manual update trigger file
-                if os.path.exists('/tmp/nxtclone-update-now'):
-                    os.remove('/tmp/nxtclone-update-now')
+                if os.path.exists('/tmp/syswatch-update-now'):
+                    os.remove('/tmp/syswatch-update-now')
                     print("Manual update trigger detected")
                     update_info = self.updater.check_for_updates()
                     if update_info.get("has_update"):

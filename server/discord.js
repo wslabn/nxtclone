@@ -36,7 +36,7 @@ class DiscordNotifier {
       color: color,
       timestamp: new Date().toISOString(),
       footer: {
-        text: "NxtClone RMM"
+        text: "SysWatch RMM"
       }
     };
 

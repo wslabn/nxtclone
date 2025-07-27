@@ -27,6 +27,19 @@ def build_windows_agent():
     
     print("Windows agent built successfully!")
     
+    # Build tray application
+    PyInstaller.__main__.run([
+        '--onefile',
+        '--noconsole',
+        '--name=syswatch-tray',
+        f'--add-data=../agents/version.txt{separator}.',
+        '--hidden-import=pystray',
+        '--hidden-import=PIL',
+        '../agents/windows_tray.py'
+    ])
+    
+    print("Windows tray application built successfully!")
+    
     # Build installer with NSIS
     try:
         import subprocess

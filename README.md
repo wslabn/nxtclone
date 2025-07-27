@@ -1,6 +1,6 @@
-# NxtClone - Remote Monitoring & Management
+# SysWatch - Remote Monitoring & Management
 
-A lightweight RMM system for monitoring machine connectivity, executing remote commands, and providing comprehensive system insights similar to Nexthink.
+A lightweight RMM system for monitoring machine connectivity, executing remote commands, and providing comprehensive system insights.
 
 ## Features
 
@@ -9,6 +9,8 @@ A lightweight RMM system for monitoring machine connectivity, executing remote c
 - **Remote Command Execution**: Execute commands on any connected machine
 - **Automatic Updates**: Fully automated update system via GitHub releases
 - **Web Dashboard**: Modern interface with system information display
+- **System Tray Control**: Windows tray icon and Linux control app
+- **Scalable UI**: Card and table views for 100+ machines
 - **Offline Detection**: Real-time alerts when machines disconnect
 - **System Information**: Hardware specs, uptime, process counts
 - **Enterprise-grade**: Built for scalability and reliability
@@ -17,7 +19,7 @@ A lightweight RMM system for monitoring machine connectivity, executing remote c
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/YOUR-USERNAME/nxtclone.git
+git clone https://github.com/wslabn/nxtclone.git
 cd nxtclone
 ```
 
@@ -35,9 +37,9 @@ Server runs on http://localhost:3000
 ### 4. Install Agents
 
 **Option A - Download Executables (Recommended):**
-- Download `nxtclone-agent-windows.exe` or `nxtclone-agent-linux` from [Releases](https://github.com/YOUR-USERNAME/nxtclone/releases)
-- Windows: Run installer or executable directly
-- Linux: `chmod +x nxtclone-agent-linux && ./nxtclone-agent-linux`
+- Download `syswatch-agent-installer.exe` (Windows) or `syswatch-agent-installer-linux` (Linux) from [Releases](https://github.com/wslabn/nxtclone/releases)
+- Windows: Run installer as administrator
+- Linux: `sudo ./syswatch-agent-installer-linux ws://your-server:3000`
 
 **Option B - Run from Source:**
 ```bash
@@ -66,20 +68,21 @@ python windows_agent.py ws://your-server:3000
 ## Agent Installation
 
 **Windows Service Installation:**
-1. Download `nxtclone-agent-installer.exe` from releases
+1. Download `syswatch-agent-installer.exe` from releases
 2. Run as administrator
 3. Enter server URL when prompted (e.g., `ws://192.168.1.100:3000`)
 4. Agent installs as Windows service and starts automatically
+5. Optional: Run `syswatch-tray.exe` for system tray control
 
 **Linux Service Installation:**
-1. Download `nxtclone-agent-linux` and `install-linux.sh`
-2. Run: `sudo ./install-linux.sh [server_url]`
-3. Example: `sudo ./install-linux.sh ws://192.168.1.100:3000`
-4. Agent installs as systemd service and starts automatically
+1. Download `syswatch-agent-installer-linux` from releases
+2. Run: `sudo ./syswatch-agent-installer-linux ws://192.168.1.100:3000`
+3. Agent installs as systemd service and starts automatically
+4. Optional: Run `./syswatch-control` for GUI/CLI management
 
 **Manual Execution:**
-- Windows: `nxtclone-agent-windows.exe`
-- Linux: `./nxtclone-agent-linux`
+- Windows: `syswatch-agent.exe`
+- Linux: `./syswatch-agent`
 
 ## Architecture
 
@@ -188,11 +191,13 @@ MIT License - see LICENSE file for details
 ## Dashboard Features
 
 - **Real-time Monitoring**: Live system metrics with progress bars
+- **Scalable Views**: Card view for details, table view for 100+ machines
 - **Machine Management**: Online/offline status with cleanup tools
 - **Remote Commands**: Execute commands with modal result display
 - **Update Management**: Check for updates and monitor progress
 - **Quick Actions**: Pre-configured system management buttons
 - **Software Inventory**: View installed programs and versions
+- **System Tray Control**: Windows tray icon and Linux control app
 
 ## Documentation
 
@@ -200,7 +205,19 @@ MIT License - see LICENSE file for details
 - **[Installation Guide](#agent-installation)** - Step-by-step setup instructions
 - **[API Documentation](#command-examples)** - Command examples and usage
 
+## System Tray Control
+
+**Windows:**
+- Run `syswatch-tray.exe` for system tray icon
+- Right-click menu: Change server, restart service, view logs, about
+- Persistent configuration storage
+
+**Linux:**
+- Run `./syswatch-control` for GUI (if available) or CLI interface
+- Auto-detects GUI availability, falls back to terminal menu
+- Same features: server config, service control, log viewing
+
 ## Project Stats
-- Total Code Files: 12
+- Total Code Files: 15
 - Last Updated: 2025-01-25
-- Current Version: 1.2.6
+- Current Version: 1.2.7

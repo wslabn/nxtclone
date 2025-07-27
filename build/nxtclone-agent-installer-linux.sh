@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# NxtClone Agent Installer for Linux
+# SysWatch Agent Installer for Linux
 # Single file installer that includes the agent
 
 set -e
 
-INSTALL_DIR="/opt/nxtclone"
-SERVICE_NAME="nxtclone-agent"
-AGENT_USER="nxtclone"
+INSTALL_DIR="/opt/syswatch"
+SERVICE_NAME="syswatch-agent"
+AGENT_USER="syswatch"
 
-echo "NxtClone Agent Installer for Linux"
+echo "SysWatch Agent Installer for Linux"
 echo "=================================="
 
 # Check if running as root
@@ -30,7 +30,7 @@ if [ -z "$SERVER_URL" ]; then
     exit 1
 fi
 
-echo "Installing NxtClone Agent..."
+echo "Installing SysWatch Agent..."
 echo "Server URL: $SERVER_URL"
 
 # Create user
@@ -50,12 +50,12 @@ AGENT_FILES_END
 
 # Set permissions
 chown -R "$AGENT_USER:$AGENT_USER" "$INSTALL_DIR"
-chmod +x "$INSTALL_DIR/nxtclone-agent-linux"
+chmod +x "$INSTALL_DIR/syswatch-agent-linux"
 
 # Create systemd service
 cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
 [Unit]
-Description=NxtClone Agent
+Description=SysWatch Agent
 After=network.target
 Wants=network.target
 
@@ -64,7 +64,7 @@ Type=simple
 User=$AGENT_USER
 Group=$AGENT_USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/nxtclone-agent-linux $SERVER_URL
+ExecStart=$INSTALL_DIR/syswatch-agent-linux $SERVER_URL
 Restart=always
 RestartSec=10
 StandardOutput=journal

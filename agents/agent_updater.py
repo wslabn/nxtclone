@@ -26,7 +26,7 @@ class AgentUpdater:
     def check_for_updates(self):
         try:
             url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/releases/latest"
-            headers = {"User-Agent": "nxtclone-agent-updater"}
+            headers = {"User-Agent": "syswatch-agent-updater"}
             
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()

@@ -7,28 +7,34 @@
 **Linux:**
 ```bash
 # Check service status
-systemctl status nxtclone-agent
+systemctl status syswatch-agent
 
 # View recent logs
-journalctl -u nxtclone-agent -n 50
+journalctl -u syswatch-agent -n 50
 
 # Follow logs in real-time
-journalctl -u nxtclone-agent -f
+journalctl -u syswatch-agent -f
 
 # Check if agent is running
-ps aux | grep nxtclone
+ps aux | grep syswatch
+
+# Use control application
+./syswatch-control
 ```
 
 **Windows:**
 ```cmd
 # Check service status
-sc query "NxtClone Agent"
+sc query "SysWatch Agent"
 
 # View service details
-sc queryex "NxtClone Agent"
+sc queryex "SysWatch Agent"
 
 # Check running processes
-tasklist | findstr nxtclone
+tasklist | findstr syswatch
+
+# Use tray application
+syswatch-tray.exe
 ```
 
 ### Agent Not Connecting
@@ -43,8 +49,8 @@ tasklist | findstr nxtclone
    ```
 3. **Check firewall settings** - Port 3000 must be open
 4. **Restart agent service:**
-   - Linux: `sudo systemctl restart nxtclone-agent`
-   - Windows: `sc stop "NxtClone Agent" && sc start "NxtClone Agent"`
+   - Linux: `sudo systemctl restart syswatch-agent` or use `./syswatch-control`
+   - Windows: `sc stop "SysWatch Agent" && sc start "SysWatch Agent"` or use tray app
 
 ## Auto-Update Issues
 
@@ -52,12 +58,16 @@ tasklist | findstr nxtclone
 
 **Linux:**
 ```bash
-cat /opt/nxtclone/version.txt
+cat /opt/syswatch/version.txt
+# or use control app
+./syswatch-control
 ```
 
 **Windows:**
 ```cmd
-type "C:\Program Files\NxtClone\NxtClone Agent\version.txt"
+type "C:\Program Files\SysWatch\SysWatch Agent\version.txt"
+# or use tray app
+syswatch-tray.exe
 ```
 
 ### Update Troubleshooting
@@ -69,13 +79,13 @@ type "C:\Program Files\NxtClone\NxtClone Agent\version.txt"
 
 2. **Manual update trigger (Linux):**
    ```bash
-   sudo touch /tmp/nxtclone-update-now
+   sudo touch /tmp/syswatch-update-now
    ```
 
 3. **View update logs:**
    - **Server:** Admin Panel → View Update Logs
-   - **Linux:** `journalctl -u nxtclone-agent -f`
-   - **Windows:** Event Viewer → Application → NxtClone Agent
+   - **Linux:** `journalctl -u syswatch-agent -f` or `./syswatch-control`
+   - **Windows:** Event Viewer → Application → SysWatch Agent or tray app
 
 4. **Force agent reinstall if updates fail:**
    - Download latest release from GitHub
@@ -207,17 +217,39 @@ type "C:\Program Files\NxtClone\NxtClone Agent\version.txt"
 ### "Update failed: repo not found"
 - **Solution:** Reinstall agent with latest version from GitHub releases
 
+### "Service not found" or "Permission denied"
+- **Solution:** Run tray/control apps as administrator (Windows) or with sudo (Linux)
+
 ### "WebSocket connection failed"
 - **Solution:** Check server status, firewall settings, network connectivity
 
+## System Tray/Control Applications
+
+### Windows Tray Not Appearing
+1. **Check if running:** `tasklist | findstr syswatch-tray`
+2. **Run as administrator** if service control needed
+3. **Check system tray settings** - may be hidden
+
+### Linux Control App Issues
+1. **GUI not available:** App automatically falls back to CLI mode
+2. **Permission errors:** Use `sudo` for service operations
+3. **Missing dependencies:** Install `python3-tk` for GUI support
+
+### Tray App Features
+- **Change Server:** Updates agent configuration
+- **Restart Service:** Requires admin/sudo privileges
+- **View Logs:** Opens system log viewer
+- **About:** Shows version and configuration
+
 ## Getting Help
 
-1. **Check server console** for error messages
-2. **View agent logs** using commands above
-3. **Check GitHub Issues:** https://github.com/wslabn/nxtclone/issues
-4. **Collect diagnostic info:**
+1. **Use tray/control apps** for quick diagnostics and management
+2. **Check server console** for error messages
+3. **View agent logs** using commands above or tray apps
+4. **Check GitHub Issues:** https://github.com/wslabn/nxtclone/releases
+5. **Collect diagnostic info:**
    - Server version
-   - Agent version
+   - Agent version (available in tray/control apps)
    - Operating system
    - Error messages
    - Network configuration
@@ -239,11 +271,13 @@ sqlite3 server/database.db ".tables"
 ### Agent Health Check
 ```bash
 # Linux
-systemctl is-active nxtclone-agent
-systemctl is-enabled nxtclone-agent
+systemctl is-active syswatch-agent
+systemctl is-enabled syswatch-agent
+./syswatch-control  # GUI/CLI interface
 
 # Windows
-sc query "NxtClone Agent"
+sc query "SysWatch Agent"
+syswatch-tray.exe  # System tray control
 ```
 
 ### Network Connectivity

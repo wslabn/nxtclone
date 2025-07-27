@@ -138,11 +138,16 @@
                 <button onclick="logout()" style="background: #f44336;">Logout</button>
             </div>
         </div>
-        <div class="update-controls" style="margin: 10px 0;">
-            <button onclick="checkForUpdates()">Check for Updates</button>
-            <button onclick="updateAllAgents()">Update All Agents</button>
-            <button onclick="cleanupOfflineMachines()" style="background: #f44336;">Cleanup Offline</button>
-            <span id="update-status"></span>
+        <div class="update-controls" style="margin: 10px 0; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <button onclick="checkForUpdates()">Check for Updates</button>
+                <button onclick="updateAllAgents()">Update All Agents</button>
+                <button onclick="cleanupOfflineMachines()" style="background: #f44336;">Cleanup Offline</button>
+                <span id="update-status"></span>
+            </div>
+            <div>
+                <button onclick="toggleView()" id="viewToggle" style="background: #9c27b0;">Table View</button>
+            </div>
         </div>
         <div class="summary" id="summary"></div>
     </div>
@@ -164,6 +169,7 @@
         let machines = [];
         let groups = JSON.parse(localStorage.getItem('machineGroups') || '{"Unknown": []}');
         let selectedGroup = 'all';
+        let viewMode = 'cards'; // 'cards' or 'table'
         
         // Ensure Unknown group exists
         if (!groups['Unknown']) {
@@ -204,11 +210,22 @@
             }
         }
 
+        function toggleView() {
+            viewMode = viewMode === 'cards' ? 'table' : 'cards';
+            document.getElementById('viewToggle').textContent = viewMode === 'cards' ? 'Table View' : 'Card View';
+            renderMachines();
+        }
+        
         function renderMachines() {
             renderSummary();
             
             const container = document.getElementById('machines');
             const filteredMachines = getFilteredMachines();
+            
+            if (viewMode === 'table') {
+                renderTableView(container, filteredMachines);
+                return;
+            }
             
             // Store current input values and result visibility
             const inputValues = {};
@@ -1334,6 +1351,105 @@
                     document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
                     window.location.href = '/login';
                 });
+        }
+        
+        function renderTableView(container, filteredMachines) {
+            if (filteredMachines.length === 0) {
+                container.innerHTML = '<div class="machine"><p>No machines in this group</p></div>';
+                return;
+            }
+            
+            const tableHtml = `
+                <table class="machines-table">
+                    <thead>
+                        <tr>
+                            <th>Machine</th>
+                            <th>Status</th>
+                            <th>Platform</th>
+                            <th>CPU</th>
+                            <th>Memory</th>
+                            <th>Disk</th>
+                            <th>Processes</th>
+                            <th>Last Seen</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filteredMachines.map(machine => {
+                            const lastSeen = new Date(machine.lastSeen).toLocaleString();
+                            const statusClass = machine.status === 'online' ? 'online-status' : 'offline-status';
+                            const metrics = machine.metrics || {};
+                            
+                            return `
+                                <tr>
+                                    <td><strong>${machine.hostname}</strong></td>
+                                    <td>
+                                        <div class="status-cell">
+                                            <div class="status-dot status-${machine.status}"></div>
+                                            <span class="${statusClass}">${machine.status.toUpperCase()}</span>
+                                        </div>
+                                    </td>
+                                    <td>${machine.platform}</td>
+                                    <td class="metric-cell">
+                                        ${metrics.cpu_percent ? 
+                                            `<div onclick="showMetricGraph('${machine.id}', 'cpu', '${machine.hostname}')" style="cursor: pointer;">
+                                                ${metrics.cpu_percent.toFixed(1)}%
+                                                <div class="progress-bar" style="width: 50px; height: 4px; margin-top: 2px;">
+                                                    <div class="progress-fill cpu-bar" style="width: ${metrics.cpu_percent}%"></div>
+                                                </div>
+                                            </div>` : 'N/A'
+                                        }
+                                    </td>
+                                    <td class="metric-cell">
+                                        ${metrics.memory_percent ? 
+                                            `<div onclick="showMetricGraph('${machine.id}', 'memory', '${machine.hostname}')" style="cursor: pointer;">
+                                                ${metrics.memory_percent.toFixed(1)}%
+                                                <div class="progress-bar" style="width: 50px; height: 4px; margin-top: 2px;">
+                                                    <div class="progress-fill memory-bar" style="width: ${metrics.memory_percent}%"></div>
+                                                </div>
+                                            </div>` : 'N/A'
+                                        }
+                                    </td>
+                                    <td class="metric-cell">
+                                        ${metrics.disk_percent ? 
+                                            `<div onclick="showMetricGraph('${machine.id}', 'disk', '${machine.hostname}')" style="cursor: pointer;">
+                                                ${metrics.disk_percent.toFixed(1)}%
+                                                <div class="progress-bar" style="width: 50px; height: 4px; margin-top: 2px;">
+                                                    <div class="progress-fill disk-bar" style="width: ${metrics.disk_percent}%"></div>
+                                                </div>
+                                            </div>` : 'N/A'
+                                        }
+                                    </td>
+                                    <td class="metric-cell">
+                                        ${metrics.process_count ? 
+                                            `<div onclick="showMetricGraph('${machine.id}', 'process', '${machine.hostname}')" style="cursor: pointer;">
+                                                ${metrics.process_count}
+                                            </div>` : 'N/A'
+                                        }
+                                    </td>
+                                    <td style="font-size: 12px;">${lastSeen}</td>
+                                    <td class="actions-cell">
+                                        <button onclick="quickAction('${machine.id}', 'processes')" 
+                                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                                style="background: #2196f3;">Proc</button>
+                                        <button onclick="quickAction('${machine.id}', 'services')" 
+                                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                                style="background: #4caf50;">Svc</button>
+                                        <button onclick="updateSingleAgent('${machine.id}')" 
+                                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                                style="background: #ff5722;">Upd</button>
+                                        <button onclick="quickAction('${machine.id}', 'reboot')" 
+                                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                                style="background: #ff9800;">Reb</button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = tableHtml;
         }
         
         // Check authentication on load

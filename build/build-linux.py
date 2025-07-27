@@ -15,6 +15,16 @@ def build_linux_agent():
     ])
     
     print("Linux agent built successfully!")
+    
+    # Build Linux control application
+    PyInstaller.__main__.run([
+        '--onefile',
+        '--name=syswatch-control',
+        f'--add-data=../agents/version.txt{separator}.',
+        '../agents/linux_tray.py'
+    ])
+    
+    print("Linux control app built successfully!")
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
