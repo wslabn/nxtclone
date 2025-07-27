@@ -818,6 +818,10 @@
         
         // Metric graphs
         async function showMetricGraph(machineId, metricType, hostname) {
+            // Store for modal refresh
+            window.currentMachineId = machineId;
+            window.currentMetricType = metricType;
+            
             try {
                 const response = await fetch(`/api/metrics/${machineId}`);
                 const metrics = await response.json();
@@ -860,16 +864,71 @@
             }
         }
         
+        async function refreshMetricGraph() {
+            if (!window.currentMetricModal) return;
+            
+            try {
+                const response = await fetch(`/api/metrics/${window.currentMetricModal.machineId}`);
+                const metrics = await response.json();
+                
+                if (metrics.error) return;
+                
+                const labels = metrics.map(m => new Date(m.timestamp).toLocaleString());
+                let data;
+                
+                switch(window.currentMetricModal.metricType) {
+                    case 'cpu': data = metrics.map(m => m.cpu_percent); break;
+                    case 'memory': data = metrics.map(m => m.memory_percent); break;
+                    case 'disk': data = metrics.map(m => m.disk_percent); break;
+                    case 'process': data = metrics.map(m => m.process_count); break;
+                }
+                
+                // Update chart data
+                window.metricChart.data.labels = labels;
+                window.metricChart.data.datasets[0].data = data;
+                window.metricChart.update();
+                
+            } catch (error) {
+                console.error('Failed to refresh graph:', error);
+            }
+        }
+        
+        function toggleRealtimeMetrics() {
+            if (!window.currentMetricModal) return;
+            
+            const btn = document.getElementById('realtimeBtn');
+            
+            if (window.currentMetricModal.isRealtime) {
+                // Turn off real-time
+                clearInterval(window.currentMetricModal.interval);
+                window.currentMetricModal.isRealtime = false;
+                btn.textContent = 'Real-time: OFF';
+                btn.className = 'btn btn-info btn-sm';
+            } else {
+                // Turn on real-time
+                window.currentMetricModal.isRealtime = true;
+                btn.textContent = 'Real-time: ON';
+                btn.className = 'btn btn-warning btn-sm';
+                
+                // Refresh every 10 seconds
+                window.currentMetricModal.interval = setInterval(refreshMetricGraph, 10000);
+            }
+        }
+        
         function showGraphModal(hostname, label, labels, data, color) {
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.display = 'block';
             modal.innerHTML = `
-                <div class="modal-dialog" style="max-width: 800px;">
+                <div class="modal-dialog" style="max-width: 800px; margin: 2rem auto;">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h3 class="modal-title">${hostname} - ${label} (Last 24 Hours)</h3>
-                            <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                            <div class="flex">
+                                <button class="btn btn-success btn-sm" onclick="refreshMetricGraph()">Refresh</button>
+                                <button class="btn btn-info btn-sm" id="realtimeBtn" onclick="toggleRealtimeMetrics()">Real-time: OFF</button>
+                                <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                            </div>
                         </div>
                         <div class="modal-body">
                             <canvas id="metricChart" style="max-height: 400px;"></canvas>
@@ -884,9 +943,20 @@
                 if (e.target === modal) modal.remove();
             };
             
+            // Store modal data for refresh/realtime
+            window.currentMetricModal = {
+                hostname,
+                label,
+                color,
+                machineId: window.currentMachineId,
+                metricType: window.currentMetricType,
+                isRealtime: false,
+                interval: null
+            };
+            
             // Create chart
             const ctx = document.getElementById('metricChart').getContext('2d');
-            new Chart(ctx, {
+            window.metricChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -907,6 +977,9 @@
                         y: {
                             beginAtZero: true,
                             max: label.includes('%') ? 100 : undefined
+                        },
+                        x: {
+                            display: false
                         }
                     },
                     plugins: {
