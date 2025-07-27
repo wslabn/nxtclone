@@ -163,6 +163,16 @@ Create releases via GitHub Actions:
 3. Enter version (e.g., "1.0.1")
 4. Automatically builds executables and creates release
 
+## Troubleshooting
+
+For common issues and solutions, see the [Troubleshooting Guide](TROUBLESHOOTING.md).
+
+**Quick Help:**
+- Agent not connecting: Check service status and logs
+- Auto-update failing: Verify GitHub connectivity and agent version
+- Dashboard issues: Clear browser cache, check authentication
+- Command execution problems: Verify agent permissions and syntax
+
 ## Contributing
 
 1. Fork the repository
@@ -184,7 +194,13 @@ MIT License - see LICENSE file for details
 - **Quick Actions**: Pre-configured system management buttons
 - **Software Inventory**: View installed programs and versions
 
+## Documentation
+
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Installation Guide](#agent-installation)** - Step-by-step setup instructions
+- **[API Documentation](#command-examples)** - Command examples and usage
+
 ## Project Stats
 - Total Code Files: 12
-- Last Updated: 2025-07-25
-- Current Version: 1.1.1
+- Last Updated: 2025-01-25
+- Current Version: 1.2.6
