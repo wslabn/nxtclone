@@ -9,7 +9,18 @@ import sys
 import os
 import psutil
 import time
+import logging
 from agent_updater import AgentUpdater
+
+# Setup logging for service debugging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('C:\\Windows\\Temp\\syswatch-agent.log'),
+        logging.StreamHandler()
+    ]
+)
 
 class WindowsAgent:
     def __init__(self, server_url="ws://localhost:3000"):
@@ -276,12 +287,29 @@ class WindowsAgent:
         except Exception as e:
             return {"error": str(e)}
 
-if __name__ == "__main__":
+def main():
+    """Main function for both service and console execution"""
     server_url = sys.argv[1] if len(sys.argv) > 1 else "ws://localhost:3000"
     agent = WindowsAgent(server_url)
     
-    print(f"Starting Windows Agent for {agent.hostname}")
-    print(f"Connecting to: {server_url}")
-    print("Auto-update enabled - agent will update automatically")
+    logging.info(f"Starting Windows Agent for {agent.hostname}")
+    logging.info(f"Connecting to: {server_url}")
+    logging.info("Auto-update enabled - agent will update automatically")
     
-    asyncio.run(agent.connect())
+    try:
+        asyncio.run(agent.connect())
+    except KeyboardInterrupt:
+        logging.info("Agent stopped by user")
+    except Exception as e:
+        logging.error(f"Agent error: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    # Check if running as Windows service
+    if len(sys.argv) > 1 and sys.argv[1] in ['install', 'remove', 'start', 'stop', 'restart']:
+        # Service management commands - ignore for now
+        print(f"Service command '{sys.argv[1]}' - use Windows Service Manager instead")
+        sys.exit(0)
+    else:
+        # Normal execution
+        main()

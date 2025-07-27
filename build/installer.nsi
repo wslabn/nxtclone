@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 15
+!define VERSIONBUILD 17
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -12,7 +12,7 @@
 !define INSTALLSIZE 10000
 
 RequestExecutionLevel admin
-InstallDir "$PROGRAMFILES64\${COMPANYNAME}"
+InstallDir "$PROGRAMFILES64\SysWatch"
 Name "${APPNAME}"
 Icon "icon.ico"
 outFile "dist\syswatch-agent-installer.exe"
@@ -83,6 +83,17 @@ Section "install"
         File /nonfatal "dist\syswatch-tray.exe"
         # Create desktop shortcut for tray app
         CreateShortCut "$DESKTOP\SysWatch Tray.lnk" "$INSTDIR\syswatch-tray.exe"
+        
+        # Create tray config file with server URL
+        FileOpen $4 "$INSTDIR\tray_config.json" w
+        FileWrite $4 '{"server_url": "$ServerUrl"}'
+        FileClose $4
+        
+        # Add to Windows startup (auto-start on boot)
+        WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SysWatch Tray" "\"$INSTDIR\syswatch-tray.exe\""
+        
+        # Start tray app immediately after installation
+        Exec '"$INSTDIR\syswatch-tray.exe"'
     ${EndIf}
     
     # Verify file was copied
@@ -93,11 +104,26 @@ Section "install"
     ExecWait 'sc stop "${APPNAME}"'
     ExecWait 'sc delete "${APPNAME}"'
     
-    # Create the service with the provided server URL
-    ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\syswatch-agent-windows.exe\" $ServerUrl" start= auto'
+    # Stop and delete any existing service first
+    ExecWait 'sc stop "${APPNAME}"' $9
+    ExecWait 'sc delete "${APPNAME}"' $9
     
-    # Don't start service automatically - let user start it manually
-    # ExecWait 'sc start "${APPNAME}"'
+    # Wait for service deletion to complete
+    Sleep 2000
+    
+    # Store server URL in registry for persistence
+    WriteRegStr HKLM "SOFTWARE\SysWatch" "ServerURL" "$ServerUrl"
+    
+    # Create the service with the provided server URL
+    ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\syswatch-agent-windows.exe\" $ServerUrl" start= auto DisplayName= "${APPNAME}"' $0
+    
+    # Start the service
+    ExecWait 'sc start "${APPNAME}"' $1
+    
+    # Check if service creation failed
+    ${If} $0 != 0
+        MessageBox MB_OK "Warning: Service creation failed. You may need to start the service manually."
+    ${EndIf}
     
     # Create uninstaller
     WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -119,10 +145,17 @@ Section "install"
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "NoRepair" 1
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "EstimatedSize" ${INSTALLSIZE}
     
-    ${If} $InstallTray == ${BST_CHECKED}
-        MessageBox MB_OK "Installation complete! The SysWatch Agent service and tray application have been installed.$\n$\nA desktop shortcut has been created for the tray app."
+    # Show final message with service status
+    ${If} $1 == 0
+        StrCpy $2 "Service is running."
     ${Else}
-        MessageBox MB_OK "Installation complete! The SysWatch Agent service has been installed."
+        StrCpy $2 "Service failed to start - check Event Viewer."
+    ${EndIf}
+    
+    ${If} $InstallTray == ${BST_CHECKED}
+        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent service: $2$\nTray app: Desktop shortcut created$\nServer: $ServerUrl"
+    ${Else}
+        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent service: $2$\nServer: $ServerUrl"
     ${EndIf}
 SectionEnd
 
@@ -134,10 +167,13 @@ Section "uninstall"
     # Remove files
     Delete "$INSTDIR\syswatch-agent-windows.exe"
     Delete "$INSTDIR\syswatch-tray.exe"
+    Delete "$INSTDIR\tray_config.json"
     Delete "$INSTDIR\uninstall.exe"
     Delete "$DESKTOP\SysWatch Tray.lnk"
     RMDir "$INSTDIR"
     
     # Remove registry entries
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}"
+    DeleteRegKey HKLM "SOFTWARE\SysWatch"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SysWatch Tray"
 SectionEnd
