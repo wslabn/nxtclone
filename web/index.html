@@ -142,7 +142,6 @@
                 <div class="group-machines" id="all-count">0 machines</div>
             </div>
             <div id="groups-list"></div>
-            <button class="add-group" onclick="addGroup()">+ Add Group</button>
         </div>
         
         <div class="main-content">
@@ -992,27 +991,7 @@
             renderMachines();
         }
         
-        async function addGroup() {
-            const name = prompt('Enter group name:');
-            if (name) {
-                try {
-                    const response = await fetch('/api/groups', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, description: '', color: '#007bff' })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        await loadDatabaseGroups();
-                        renderGroups();
-                    } else {
-                        alert('Error creating group: ' + result.error);
-                    }
-                } catch (error) {
-                    alert('Error creating group: ' + error.message);
-                }
-            }
-        }
+
         
         async function loadDatabaseGroups() {
             try {

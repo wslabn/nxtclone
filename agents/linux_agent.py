@@ -78,15 +78,26 @@ class LinuxAgent:
     
     async def register(self, websocket):
         system_info = self.get_system_info()
+        
+        # Read version from file
+        version = "Unknown"
+        try:
+            version_file = os.path.join(os.path.dirname(__file__), "version.txt")
+            if os.path.exists(version_file):
+                with open(version_file, 'r') as f:
+                    version = f.read().strip()
+        except Exception as e:
+            print(f"Could not read version: {e}")
+        
         register_msg = {
             "type": "register",
             "hostname": self.hostname,
             "platform": self.platform,
             "system_info": system_info,
-            "agentVersion": "Unknown"
+            "agentVersion": version
         }
         await websocket.send(json.dumps(register_msg))
-        print(f"Registered as {self.hostname} ({self.platform})")
+        print(f"Registered as {self.hostname} ({self.platform}) - Agent v{version}")
     
     async def heartbeat(self, websocket):
         while True:
