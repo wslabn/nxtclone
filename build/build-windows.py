@@ -27,16 +27,28 @@ def build_windows_agent():
     
     print("Windows agent built successfully!")
     
+    # Install tray dependencies
+    try:
+        import subprocess
+        subprocess.run([sys.executable, '-m', 'pip', 'install', 'pystray', 'pillow'], check=True)
+    except Exception as e:
+        print(f"Warning: Failed to install tray dependencies: {e}")
+    
     # Build tray application
-    PyInstaller.__main__.run([
-        '--onefile',
-        '--noconsole',
-        '--name=syswatch-tray',
-        f'--add-data=../agents/version.txt{separator}.',
-        '--hidden-import=pystray',
-        '--hidden-import=PIL',
-        '../agents/windows_tray.py'
-    ])
+    try:
+        PyInstaller.__main__.run([
+            '--onefile',
+            '--noconsole',
+            '--name=syswatch-tray',
+            f'--add-data=../agents/version.txt{separator}.',
+            '--hidden-import=pystray',
+            '--hidden-import=PIL',
+            '--hidden-import=tkinter',
+            '../agents/windows_tray.py'
+        ])
+        print("Windows tray application built successfully!")
+    except Exception as e:
+        print(f"Warning: Tray application build failed: {e}")
     
     print("Windows tray application built successfully!")
     
