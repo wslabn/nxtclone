@@ -176,6 +176,35 @@
             groups['Unknown'] = [];
         }
 
+        async function uninstallAgent(machineId) {
+            const machine = machines.find(m => m.id === machineId);
+            if (!machine) return;
+            
+            if (!confirm(`Are you sure you want to uninstall the SysWatch agent from ${machine.hostname}? This action cannot be undone and the machine will be removed from monitoring.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/uninstall-agent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Uninstall command sent to ${machine.hostname}. The agent will be removed shortly.`);
+                    // Refresh machines list after a delay
+                    setTimeout(loadMachines, 3000);
+                } else {
+                    alert(`Failed to send uninstall command: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Uninstall request failed: ${error.message}`);
+            }
+        }
+        
         async function cleanupOfflineMachines() {
             if (!confirm('Remove all offline machines? This cannot be undone.')) {
                 return;
@@ -292,6 +321,9 @@
                         <button onclick="updateSingleAgent('${machine.id}')" 
                                 ${machine.status === 'offline' ? 'disabled' : ''} 
                                 style="background: #ff5722; margin-right: 5px;">Update</button>
+                        <button onclick="uninstallAgent('${machine.id}')" 
+                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                style="background: #f44336; margin-right: 5px;">Uninstall</button>
                     </div>
                     
 
@@ -1441,6 +1473,9 @@
                                         <button onclick="quickAction('${machine.id}', 'reboot')" 
                                                 ${machine.status === 'offline' ? 'disabled' : ''} 
                                                 style="background: #ff9800;">Reb</button>
+                                        <button onclick="uninstallAgent('${machine.id}')" 
+                                                ${machine.status === 'offline' ? 'disabled' : ''} 
+                                                style="background: #f44336;">Uninst</button>
                                     </td>
                                 </tr>
                             `;

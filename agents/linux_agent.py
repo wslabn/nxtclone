@@ -179,6 +179,48 @@ class LinuxAgent:
                     "error": str(e)
                 }))
                 print(f"Auto-update failed: {e}")
+                
+        elif message["type"] == "uninstall_request":
+            print("Uninstall request received")
+            try:
+                await websocket.send(json.dumps({
+                    "type": "agent_log",
+                    "hostname": self.hostname,
+                    "message": "Starting agent uninstall..."
+                }))
+                
+                # Uninstall commands for Linux
+                uninstall_commands = [
+                    "sudo systemctl stop syswatch-agent",
+                    "sudo systemctl disable syswatch-agent",
+                    "sudo rm -f /etc/systemd/system/syswatch-agent.service",
+                    "sudo systemctl daemon-reload",
+                    "sudo rm -rf /opt/syswatch",
+                    "sudo userdel syswatch 2>/dev/null || true"
+                ]
+                
+                for cmd in uninstall_commands:
+                    print(f"Executing: {cmd}")
+                    result = subprocess.run(cmd.split(), capture_output=True, text=True)
+                    if result.returncode != 0 and "userdel" not in cmd:
+                        print(f"Warning: {cmd} failed: {result.stderr}")
+                
+                await websocket.send(json.dumps({
+                    "type": "agent_log",
+                    "hostname": self.hostname,
+                    "message": "Agent uninstalled successfully. Goodbye!"
+                }))
+                
+                print("Agent uninstalled. Exiting...")
+                sys.exit(0)
+                
+            except Exception as e:
+                await websocket.send(json.dumps({
+                    "type": "agent_log",
+                    "hostname": self.hostname,
+                    "message": f"Uninstall failed: {str(e)}"
+                }))
+                print(f"Uninstall failed: {e}")
     
     def get_system_info(self):
         """Get static system information"""

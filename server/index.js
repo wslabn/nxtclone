@@ -257,6 +257,22 @@ class RMMServer {
         res.json({ error: error.message });
       }
     });
+    
+    this.app.post('/api/uninstall-agent', async (req, res) => {
+      try {
+        const { machineId } = req.body;
+        const client = this.clients.get(machineId);
+        
+        if (!client || client.ws.readyState !== WebSocket.OPEN) {
+          return res.json({ success: false, error: 'Machine not connected' });
+        }
+        
+        client.ws.send(JSON.stringify({ type: 'uninstall_request' }));
+        res.json({ success: true });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
 
     this.app.post('/api/cleanup-offline', (req, res) => {
       try {
@@ -493,6 +509,11 @@ class RMMServer {
         });
         if (global.serverLogs.length > 200) {
           global.serverLogs.shift();
+        }
+        
+        // Send Discord alert for uninstall
+        if (message.message.includes('Agent uninstalled successfully')) {
+          this.discord.agentUninstalled(message.hostname);
         }
         break;
     }

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import asyncio
 import websockets
 import json
@@ -5,9 +6,9 @@ import socket
 import platform
 import subprocess
 import sys
-import time
-import psutil
 import os
+import psutil
+import time
 from agent_updater import AgentUpdater
 
 class WindowsAgent:
@@ -17,7 +18,6 @@ class WindowsAgent:
         self.hostname = socket.gethostname()
         self.platform = f"{platform.system()} {platform.release()}"
         self.updater = AgentUpdater()
-        self.check_and_migrate()
         
     async def connect(self):
         # Start periodic update check
@@ -99,10 +99,9 @@ class WindowsAgent:
             print(f"Executing command: {command}")
             
             try:
-                # Execute command
+                # Execute command with cmd
                 result = subprocess.run(
-                    command,
-                    shell=True,
+                    ["cmd", "/c", command],
                     capture_output=True,
                     text=True,
                     timeout=30
@@ -131,53 +130,116 @@ class WindowsAgent:
         elif message["type"] == "update_request":
             print("Auto-update request received")
             try:
+                # Send status update
+                await websocket.send(json.dumps({
+                    "type": "update_status",
+                    "hostname": self.hostname,
+                    "status": "checking"
+                }))
+                
+                await websocket.send(json.dumps({
+                    "type": "agent_log",
+                    "hostname": self.hostname,
+                    "message": "Checking for updates..."
+                }))
+                
                 update_info = self.updater.check_for_updates()
                 if update_info.get("has_update"):
+                    await websocket.send(json.dumps({
+                        "type": "update_status",
+                        "hostname": self.hostname,
+                        "status": "updating",
+                        "version": update_info['latest_version']
+                    }))
+                    
+                    await websocket.send(json.dumps({
+                        "type": "agent_log",
+                        "hostname": self.hostname,
+                        "message": f"Updating from {update_info['current_version']} to {update_info['latest_version']}"
+                    }))
+                    
                     print(f"Auto-updating: {update_info['current_version']} -> {update_info['latest_version']}")
                     if self.updater.download_and_update(update_info["download_url"]):
+                        await websocket.send(json.dumps({
+                            "type": "agent_log",
+                            "hostname": self.hostname,
+                            "message": "Update successful, restarting agent..."
+                        }))
                         print("Update successful, restarting...")
                         self.updater.restart_agent()
+                    else:
+                        await websocket.send(json.dumps({
+                            "type": "agent_log",
+                            "hostname": self.hostname,
+                            "message": "Update download/install failed"
+                        }))
                 else:
+                    await websocket.send(json.dumps({
+                        "type": "update_status",
+                        "hostname": self.hostname,
+                        "status": "up_to_date"
+                    }))
+                    
+                    await websocket.send(json.dumps({
+                        "type": "agent_log",
+                        "hostname": self.hostname,
+                        "message": "Agent is already up to date"
+                    }))
                     print("Agent is already up to date")
             except Exception as e:
+                await websocket.send(json.dumps({
+                    "type": "update_status",
+                    "hostname": self.hostname,
+                    "status": "error",
+                    "error": str(e)
+                }))
+                
+                await websocket.send(json.dumps({
+                    "type": "agent_log",
+                    "hostname": self.hostname,
+                    "message": f"Update failed: {str(e)}"
+                }))
                 print(f"Auto-update failed: {e}")
-    
-    def check_and_migrate(self):
-        """Check if we need to migrate from old installation"""
-        try:
-            import subprocess
-            
-            # Check if old service exists
-            result = subprocess.run(['sc', 'query', 'NxtClone Agent'], 
-                                  capture_output=True, text=True)
-            
-            # Only migrate if old service exists AND points to x86 folder
-            if result.returncode == 0 and 'Program Files (x86)' in result.stdout:
-                print("Migrating from old installation...")
                 
-                # Stop old service
-                subprocess.run(['sc', 'stop', 'NxtClone Agent'], capture_output=True)
+        elif message["type"] == "uninstall_request":
+            print("Uninstall request received")
+            try:
+                await websocket.send(json.dumps({
+                    "type": "agent_log",
+                    "hostname": self.hostname,
+                    "message": "Starting agent uninstall..."
+                }))
                 
-                # Delete old service
-                subprocess.run(['sc', 'delete', 'NxtClone Agent'], capture_output=True)
+                # Uninstall commands for Windows
+                uninstall_commands = [
+                    'sc stop "SysWatch Agent"',
+                    'sc delete "SysWatch Agent"',
+                    'rmdir /s /q "C:\\Program Files\\SysWatch"',
+                    'rmdir /s /q "C:\\Program Files (x86)\\SysWatch"'
+                ]
                 
-                # Clean up old folder
-                old_path = r"C:\Program Files (x86)\NxtClone"
-                if os.path.exists(old_path):
-                    import shutil
-                    try:
-                        shutil.rmtree(old_path)
-                        print("Removed old installation folder")
-                    except:
-                        print("Could not remove old folder - manual cleanup needed")
+                for cmd in uninstall_commands:
+                    print(f"Executing: {cmd}")
+                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                    if result.returncode != 0 and "rmdir" not in cmd:
+                        print(f"Warning: {cmd} failed: {result.stderr}")
                 
-                print("Migration completed")
-            else:
-                # New install - no migration needed
-                print("New installation detected - no migration required")
+                await websocket.send(json.dumps({
+                    "type": "agent_log",
+                    "hostname": self.hostname,
+                    "message": "Agent uninstalled successfully. Goodbye!"
+                }))
                 
-        except Exception as e:
-            print(f"Migration check failed: {e}")
+                print("Agent uninstalled. Exiting...")
+                sys.exit(0)
+                
+            except Exception as e:
+                await websocket.send(json.dumps({
+                    "type": "agent_log",
+                    "hostname": self.hostname,
+                    "message": f"Uninstall failed: {str(e)}"
+                }))
+                print(f"Uninstall failed: {e}")
     
     def get_system_info(self):
         """Get static system information"""
@@ -186,7 +248,7 @@ class WindowsAgent:
                 "cpu_count": psutil.cpu_count(),
                 "cpu_freq": psutil.cpu_freq().current if psutil.cpu_freq() else 0,
                 "memory_total": psutil.virtual_memory().total,
-                "disk_total": psutil.disk_usage('/').total if os.name != 'nt' else psutil.disk_usage('C:').total,
+                "disk_total": psutil.disk_usage('C:\\').total,
                 "boot_time": psutil.boot_time(),
                 "platform_details": platform.platform(),
                 "architecture": platform.architecture()[0]
@@ -198,7 +260,7 @@ class WindowsAgent:
         """Get real-time system metrics"""
         try:
             memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('C:') if os.name == 'nt' else psutil.disk_usage('/')
+            disk = psutil.disk_usage('C:\\')
             
             return {
                 "cpu_percent": psutil.cpu_percent(interval=1),
@@ -213,83 +275,8 @@ class WindowsAgent:
         except Exception as e:
             return {"error": str(e)}
 
-def install_service(server_url=None):
-    """Install as Windows service"""
-    import subprocess
-    import sys
-    
-    # Prompt for server URL if not provided
-    if not server_url:
-        print("\n=== NxtClone Agent Installation ===")
-        print("Please enter the server URL to connect to.")
-        print("Examples:")
-        print("  ws://192.168.1.100:3000")
-        print("  ws://server.domain.com:3000")
-        print("  ws://localhost:3000")
-        print()
-        
-        while True:
-            server_url = input("Server URL: ").strip()
-            if server_url:
-                if not server_url.startswith('ws://'):
-                    print("URL must start with 'ws://' - try again.")
-                    continue
-                break
-            else:
-                print("URL cannot be empty - try again.")
-    
-    service_name = "NxtClone Agent"
-    exe_path = sys.executable if sys.executable.endswith('.exe') else sys.argv[0]
-    
-    # Create service
-    cmd = f'sc create "{service_name}" binPath= "\"{exe_path}\" {server_url}" start= auto'
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    
-    if result.returncode == 0:
-        print(f"Service '{service_name}' installed successfully")
-        print(f"Server URL: {server_url}")
-        print("Service will start automatically on next boot.")
-        print("To start now: sc start \"NxtClone Agent\"")
-    else:
-        print(f"Failed to install service: {result.stderr}")
-        if "already exists" in result.stderr:
-            print("Service already exists. Use 'uninstall' first, then 'install' again.")
-
-def uninstall_service():
-    """Uninstall Windows service"""
-    import subprocess
-    
-    service_name = "NxtClone Agent"
-    
-    # Stop and delete service
-    subprocess.run(f'sc stop "{service_name}"', shell=True)
-    result = subprocess.run(f'sc delete "{service_name}"', shell=True, capture_output=True, text=True)
-    
-    if result.returncode == 0:
-        print(f"Service '{service_name}' uninstalled successfully")
-    else:
-        print(f"Failed to uninstall service: {result.stderr}")
-
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "install":
-            server_url = sys.argv[2] if len(sys.argv) > 2 else None
-            install_service(server_url)
-            sys.exit(0)
-        elif sys.argv[1] == "uninstall":
-            uninstall_service()
-            sys.exit(0)
-        elif sys.argv[1].startswith("ws://"):
-            server_url = sys.argv[1]
-        else:
-            print("Usage:")
-            print("  nxtclone-agent.exe install [server_url]  - Install as service (prompts for URL if not provided)")
-            print("  nxtclone-agent.exe uninstall             - Remove service")
-            print("  nxtclone-agent.exe ws://server:port      - Run directly")
-            sys.exit(1)
-    else:
-        server_url = "ws://localhost:3000"
-    
+    server_url = sys.argv[1] if len(sys.argv) > 1 else "ws://localhost:3000"
     agent = WindowsAgent(server_url)
     
     print(f"Starting Windows Agent for {agent.hostname}")

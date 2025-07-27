@@ -80,6 +80,14 @@ class DiscordNotifier {
     );
   }
   
+  async agentUninstalled(hostname, group = 'Unknown') {
+    return this.sendAlert(
+      '🗑️ Agent Uninstalled',
+      `**${hostname}** (${group}) - SysWatch agent has been removed`,
+      0xff5722
+    );
+  }
+  
   async sendProactiveAlert(message) {
     if (!this.webhookUrl) return false;
     

@@ -32,7 +32,12 @@ AGENT_FILES_BASE64=$(base64 -w 0 agent-files.tar.gz)
 # Create final installer
 cd - > /dev/null
 cp nxtclone-agent-installer-linux.sh dist/syswatch-agent-installer-linux
-sed -i "s/__AGENT_FILES_BASE64__/$AGENT_FILES_BASE64/" dist/syswatch-agent-installer-linux
+
+# Use printf instead of sed for large data
+printf '%s\n' "$AGENT_FILES_BASE64" > /tmp/agent_data.b64
+awk '/^__AGENT_FILES_BASE64__$/ {system("cat /tmp/agent_data.b64"); next} 1' nxtclone-agent-installer-linux.sh > dist/syswatch-agent-installer-linux
+rm /tmp/agent_data.b64
+
 chmod +x dist/syswatch-agent-installer-linux
 
 # Cleanup
