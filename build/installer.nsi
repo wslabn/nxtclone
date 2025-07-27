@@ -92,7 +92,7 @@ Section "install"
         FileClose $4
         
         # Add to Windows startup (auto-start on boot)
-        WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SysWatch Tray" "\"$INSTDIR\syswatch-tray.exe\""
+        WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SysWatch Tray" '$INSTDIR\syswatch-tray.exe'
         
         # Start tray app immediately after installation
         Exec '"$INSTDIR\syswatch-tray.exe"'
