@@ -27,7 +27,44 @@ class WindowsAgent:
         self.server_url = server_url
         self.client_id = None
         self.hostname = socket.gethostname()
-        self.platform = f"{platform.system()} {platform.release()}"
+        # Enhanced Windows version detection with patch level
+        if platform.system() == 'Windows':
+            try:
+                import winreg
+                import re
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
+                current_build = winreg.QueryValueEx(key, "CurrentBuild")[0]
+                ubr = winreg.QueryValueEx(key, "UBR")[0]
+                
+                # Get display version (22H2, 23H2, etc.)
+                try:
+                    display_version = winreg.QueryValueEx(key, "DisplayVersion")[0]
+                except:
+                    display_version = winreg.QueryValueEx(key, "ReleaseId")[0]
+                
+                # Determine Windows version based on build number
+                build_num = int(current_build)
+                if build_num >= 22000:
+                    win_version = "Windows-11"
+                else:
+                    win_version = "Windows-10"
+                
+                self.platform = f"{win_version}-{display_version}-{current_build}.{ubr}"
+                winreg.CloseKey(key)
+            except Exception as e:
+                # Fallback to basic detection
+                platform_str = platform.platform()
+                build_match = re.search(r'10\.0\.(\d+)', platform_str)
+                if build_match:
+                    build_num = int(build_match.group(1))
+                    if build_num >= 22000:
+                        self.platform = platform_str.replace('Windows-10', 'Windows-11')
+                    else:
+                        self.platform = platform_str
+                else:
+                    self.platform = platform_str
+        else:
+            self.platform = platform.platform()
         self.updater = AgentUpdater()
         
     async def connect(self):
