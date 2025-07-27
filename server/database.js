@@ -66,6 +66,44 @@ class Database {
       
       this.db.run(`CREATE INDEX IF NOT EXISTS idx_alerts_machine_time ON alerts (machine_id, timestamp)`);
       
+      // Agent groups table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS agent_groups (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT UNIQUE NOT NULL,
+          description TEXT,
+          color TEXT DEFAULT '#007bff',
+          created_at INTEGER DEFAULT (strftime('%s', 'now'))
+        )
+      `);
+      
+      // Agent group memberships
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS agent_group_members (
+          group_id INTEGER,
+          machine_id TEXT,
+          added_at INTEGER DEFAULT (strftime('%s', 'now')),
+          PRIMARY KEY (group_id, machine_id),
+          FOREIGN KEY (group_id) REFERENCES agent_groups (id) ON DELETE CASCADE,
+          FOREIGN KEY (machine_id) REFERENCES machines (id) ON DELETE CASCADE
+        )
+      `);
+      
+      // Agent configurations
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS agent_configs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          machine_id TEXT,
+          config_key TEXT,
+          config_value TEXT,
+          applied_at INTEGER,
+          created_at INTEGER DEFAULT (strftime('%s', 'now')),
+          FOREIGN KEY (machine_id) REFERENCES machines (id) ON DELETE CASCADE
+        )
+      `);
+      
+      this.db.run(`CREATE INDEX IF NOT EXISTS idx_agent_configs_machine ON agent_configs (machine_id)`);
+      
       // Add agent_version column if it doesn't exist (migration)
       this.db.run(`ALTER TABLE machines ADD COLUMN agent_version TEXT DEFAULT 'Unknown'`, (err) => {
         if (err && !err.message.includes('duplicate column')) {
@@ -233,6 +271,100 @@ class Database {
         }
       });
     });
+  }
+  
+  // Agent Groups
+  createGroup(name, description, color = '#007bff') {
+    return new Promise((resolve, reject) => {
+      const stmt = this.db.prepare('INSERT INTO agent_groups (name, description, color) VALUES (?, ?, ?)');
+      stmt.run(name, description, color, function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      });
+      stmt.finalize();
+    });
+  }
+  
+  getGroups() {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT g.*, COUNT(m.machine_id) as member_count
+        FROM agent_groups g
+        LEFT JOIN agent_group_members m ON g.id = m.group_id
+        GROUP BY g.id
+        ORDER BY g.name
+      `, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+  
+  addToGroup(groupId, machineId) {
+    const stmt = this.db.prepare('INSERT OR IGNORE INTO agent_group_members (group_id, machine_id) VALUES (?, ?)');
+    stmt.run(groupId, machineId);
+    stmt.finalize();
+  }
+  
+  removeFromGroup(groupId, machineId) {
+    const stmt = this.db.prepare('DELETE FROM agent_group_members WHERE group_id = ? AND machine_id = ?');
+    stmt.run(groupId, machineId);
+    stmt.finalize();
+  }
+  
+  getGroupMembers(groupId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT m.*, g.name as group_name
+        FROM machines m
+        JOIN agent_group_members gm ON m.id = gm.machine_id
+        JOIN agent_groups g ON gm.group_id = g.id
+        WHERE g.id = ?
+      `, [groupId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
+  
+  // Agent Configuration
+  setAgentConfig(machineId, configKey, configValue) {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO agent_configs (machine_id, config_key, config_value)
+      VALUES (?, ?, ?)
+    `);
+    stmt.run(machineId, configKey, configValue);
+    stmt.finalize();
+  }
+  
+  getAgentConfig(machineId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT config_key, config_value, applied_at FROM agent_configs WHERE machine_id = ?',
+        [machineId],
+        (err, rows) => {
+          if (err) reject(err);
+          else {
+            const config = {};
+            rows.forEach(row => {
+              config[row.config_key] = {
+                value: row.config_value,
+                applied_at: row.applied_at
+              };
+            });
+            resolve(config);
+          }
+        }
+      );
+    });
+  }
+  
+  markConfigApplied(machineId, configKey) {
+    const stmt = this.db.prepare(
+      'UPDATE agent_configs SET applied_at = ? WHERE machine_id = ? AND config_key = ?'
+    );
+    stmt.run(Date.now(), machineId, configKey);
+    stmt.finalize();
   }
 }
 

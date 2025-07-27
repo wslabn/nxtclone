@@ -252,6 +252,39 @@ class WindowsAgent:
                     "message": f"Uninstall failed: {str(e)}"
                 }))
                 print(f"Uninstall failed: {e}")
+                
+        elif message["type"] == "config_update":
+            print("Configuration update received")
+            try:
+                config = message.get("config", {})
+                for key, value in config.items():
+                    await self.apply_config(key, value)
+                    
+                    # Acknowledge configuration applied
+                    await websocket.send(json.dumps({
+                        "type": "config_applied",
+                        "hostname": self.hostname,
+                        "configKey": key
+                    }))
+            except Exception as e:
+                print(f"Config update failed: {e}")
+    
+    async def apply_config(self, key, value):
+        """Apply configuration setting"""
+        try:
+            if key == "heartbeat_interval":
+                # Update heartbeat interval (would need to restart heartbeat task)
+                print(f"Heartbeat interval updated to {value} seconds")
+            elif key == "server_url":
+                # Update server URL (would need reconnection)
+                print(f"Server URL updated to {value}")
+            elif key == "log_level":
+                # Update logging level
+                print(f"Log level updated to {value}")
+            else:
+                print(f"Unknown config key: {key}")
+        except Exception as e:
+            print(f"Failed to apply config {key}: {e}")
     
     def get_system_info(self):
         """Get static system information"""

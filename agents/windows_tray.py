@@ -107,15 +107,14 @@ class SysWatchTray:
     def view_logs(self, icon, item):
         def show_logs():
             try:
-                # Open Event Viewer filtered to SysWatch Agent
-                subprocess.run([
-                    'eventvwr.msc', 
-                    '/c:Application', 
-                    '/f:*[System/Provider/@Name="SysWatch Agent"]'
-                ], check=False)
-            except:
-                # Fallback - just open Event Viewer
+                # Just open Event Viewer - filtering is too complex
                 subprocess.run(['eventvwr.msc'], check=False)
+            except Exception as e:
+                # Fallback - open Windows Logs folder
+                try:
+                    subprocess.run(['explorer', 'C:\\Windows\\System32\\winevt\\Logs'], check=False)
+                except:
+                    self.show_notification(f"Could not open logs: {str(e)}")
         
         threading.Thread(target=show_logs, daemon=True).start()
     

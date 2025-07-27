@@ -382,6 +382,146 @@ class RMMServer {
       this.groups = new Map(Object.entries(groups || {}));
       res.json({ success: true });
     });
+    
+    // Agent Groups API
+    this.app.get('/api/groups', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const groups = await this.db.getGroups();
+        res.json(groups);
+      } catch (error) {
+        res.json({ error: error.message });
+      }
+    });
+    
+    this.app.post('/api/groups', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const { name, description, color } = req.body;
+        const groupId = await this.db.createGroup(name, description, color);
+        res.json({ success: true, groupId });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+    
+    this.app.post('/api/groups/:groupId/members', this.auth.requireAuth.bind(this.auth), (req, res) => {
+      try {
+        const { groupId } = req.params;
+        const { machineId } = req.body;
+        this.db.addToGroup(parseInt(groupId), machineId);
+        res.json({ success: true });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+    
+    this.app.delete('/api/groups/:groupId/members/:machineId', this.auth.requireAuth.bind(this.auth), (req, res) => {
+      try {
+        const { groupId, machineId } = req.params;
+        this.db.removeFromGroup(parseInt(groupId), machineId);
+        res.json({ success: true });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+    
+    this.app.get('/api/groups/:groupId/members', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const { groupId } = req.params;
+        const members = await this.db.getGroupMembers(parseInt(groupId));
+        res.json(members);
+      } catch (error) {
+        res.json({ error: error.message });
+      }
+    });
+    
+    // Agent Configuration API
+    this.app.get('/api/config/:machineId', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const { machineId } = req.params;
+        const config = await this.db.getAgentConfig(machineId);
+        res.json(config);
+      } catch (error) {
+        res.json({ error: error.message });
+      }
+    });
+    
+    this.app.post('/api/config/:machineId', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const { machineId } = req.params;
+        const { configKey, configValue } = req.body;
+        
+        this.db.setAgentConfig(machineId, configKey, configValue);
+        
+        // Send config update to agent if connected
+        const client = this.clients.get(machineId);
+        if (client && client.ws.readyState === WebSocket.OPEN) {
+          client.ws.send(JSON.stringify({
+            type: 'config_update',
+            config: { [configKey]: configValue }
+          }));
+        }
+        
+        res.json({ success: true });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+    
+    // Bulk operations
+    this.app.post('/api/groups/:groupId/command', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const { groupId } = req.params;
+        const { command } = req.body;
+        
+        const members = await this.db.getGroupMembers(parseInt(groupId));
+        const results = [];
+        
+        for (const member of members) {
+          const client = this.clients.get(member.id);
+          if (client && client.ws.readyState === WebSocket.OPEN) {
+            const commandId = uuidv4();
+            client.ws.send(JSON.stringify({
+              type: 'command',
+              id: commandId,
+              command: command
+            }));
+            results.push({ machineId: member.id, commandId, status: 'sent' });
+          } else {
+            results.push({ machineId: member.id, status: 'offline' });
+          }
+        }
+        
+        res.json({ success: true, results });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+    
+    this.app.post('/api/groups/:groupId/config', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const { groupId } = req.params;
+        const { configKey, configValue } = req.body;
+        
+        const members = await this.db.getGroupMembers(parseInt(groupId));
+        
+        for (const member of members) {
+          this.db.setAgentConfig(member.id, configKey, configValue);
+          
+          // Send config update to agent if connected
+          const client = this.clients.get(member.id);
+          if (client && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(JSON.stringify({
+              type: 'config_update',
+              config: { [configKey]: configValue }
+            }));
+          }
+        }
+        
+        res.json({ success: true, updated: members.length });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
   }
 
   setupWebSocket() {
@@ -532,6 +672,15 @@ class RMMServer {
         // Send Discord alert for uninstall
         if (message.message.includes('Agent uninstalled successfully')) {
           this.discord.agentUninstalled(message.hostname);
+        }
+        break;
+        
+      case 'config_applied':
+        console.log(`Config applied on ${message.hostname}: ${message.configKey}`);
+        // Mark configuration as applied in database
+        const configClient = Array.from(this.clients.values()).find(c => c.hostname === message.hostname);
+        if (configClient) {
+          this.db.markConfigApplied(configClient.id, message.configKey);
         }
         break;
     }

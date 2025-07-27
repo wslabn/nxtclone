@@ -4,21 +4,23 @@ import win32event
 import servicemanager
 import sys
 import os
-import asyncio
-from windows_agent import WindowsAgent
+import subprocess
+import time
 
-class NxtCloneService(win32serviceutil.ServiceFramework):
-    _svc_name_ = "NxtClone Agent"
-    _svc_display_name_ = "NxtClone Agent"
+class SysWatchService(win32serviceutil.ServiceFramework):
+    _svc_name_ = "SysWatch Agent"
+    _svc_display_name_ = "SysWatch Agent"
     _svc_description_ = "Remote monitoring and management agent"
 
     def __init__(self, args):
         win32serviceutil.ServiceFramework.__init__(self, args)
         self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
-        self.agent = None
+        self.process = None
 
     def SvcStop(self):
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
+        if self.process:
+            self.process.terminate()
         win32event.SetEvent(self.hWaitStop)
 
     def SvcDoRun(self):
@@ -31,16 +33,29 @@ class NxtCloneService(win32serviceutil.ServiceFramework):
         if len(sys.argv) > 1:
             server_url = sys.argv[1]
         
+        # Get the directory where this service is running
+        service_dir = os.path.dirname(os.path.abspath(__file__))
+        agent_path = os.path.join(service_dir, "windows_agent.py")
+        
+        # Start the agent process
         try:
-            self.agent = WindowsAgent(server_url)
-            asyncio.run(self.agent.connect())
+            self.process = subprocess.Popen([
+                sys.executable, agent_path, server_url
+            ], cwd=service_dir)
+            
+            # Wait for stop signal or process to end
+            while True:
+                if win32event.WaitForSingleObject(self.hWaitStop, 1000) == win32event.WAIT_OBJECT_0:
+                    break
+                if self.process.poll() is not None:
+                    # Process ended, restart it
+                    time.sleep(5)
+                    self.process = subprocess.Popen([
+                        sys.executable, agent_path, server_url
+                    ], cwd=service_dir)
+                    
         except Exception as e:
-            servicemanager.LogErrorMsg(f"Service error: {e}")
+            servicemanager.LogErrorMsg(f"Service error: {str(e)}")
 
 if __name__ == '__main__':
-    if len(sys.argv) == 1:
-        servicemanager.Initialize()
-        servicemanager.PrepareToHostSingle(NxtCloneService)
-        servicemanager.StartServiceCtrlDispatcher()
-    else:
-        win32serviceutil.HandleCommandLine(NxtCloneService)
+    win32serviceutil.HandleCommandLine(SysWatchService)
