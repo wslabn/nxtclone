@@ -234,27 +234,17 @@ class AgentUpdater:
     def restart_agent(self):
         """Restart the current agent process"""
         try:
+            # Get current script path and arguments
+            script_path = sys.argv[0]
+            args = sys.argv[1:]
+            
+            # Start new process directly (skip service restart for both platforms)
             if sys.platform.startswith('win'):
-                # For Windows, restart the service
-                try:
-                    subprocess.run(['sc', 'stop', 'SysWatch Agent'], check=False, capture_output=True)
-                    subprocess.run(['sc', 'start', 'SysWatch Agent'], check=False, capture_output=True)
-                    print("Service restart initiated")
-                except:
-                    # Fallback to process restart
-                    script_path = sys.argv[0]
-                    args = sys.argv[1:]
-                    subprocess.Popen([sys.executable, script_path] + args)
+                subprocess.Popen([script_path] + args, creationflags=subprocess.CREATE_NO_WINDOW)
             else:
-                # For Linux, restart systemd service or process
-                try:
-                    subprocess.run(['sudo', 'systemctl', 'restart', 'syswatch-agent'], check=False, capture_output=True)
-                    print("Service restart initiated")
-                except:
-                    # Fallback to process restart
-                    script_path = sys.argv[0]
-                    args = sys.argv[1:]
-                    subprocess.Popen([sys.executable, script_path] + args)
+                subprocess.Popen([script_path] + args)
+            
+            print("Process restart initiated")
             
             # Exit current process
             sys.exit(0)
