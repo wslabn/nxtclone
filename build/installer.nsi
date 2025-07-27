@@ -113,10 +113,8 @@ Section "install"
     # Wait for service deletion to complete
     Sleep 2000
     
-    # Download NSSM
-    NSISdl::download "https://nssm.cc/release/nssm-2.24.zip" "$TEMP\nssm.zip"
-    nsisunz::UnzipToLog "$TEMP\nssm.zip" "$TEMP"
-    CopyFiles "$TEMP\nssm-2.24\win64\nssm.exe" "$INSTDIR\nssm.exe"
+    # Copy NSSM (include nssm.exe in build/dist/)
+    File /nonfatal "dist\nssm.exe"
     
     # Install service using NSSM
     ExecWait '"$INSTDIR\nssm.exe" install "${APPNAME}" "$INSTDIR\syswatch-agent-windows.exe" $ServerUrl' $0

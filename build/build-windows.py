@@ -52,6 +52,21 @@ def build_windows_agent():
     
     print("Windows tray application built successfully!")
     
+    # Download NSSM
+    try:
+        import urllib.request
+        import zipfile
+        print("Downloading NSSM...")
+        urllib.request.urlretrieve('https://nssm.cc/release/nssm-2.24.zip', 'nssm.zip')
+        with zipfile.ZipFile('nssm.zip', 'r') as zip_ref:
+            zip_ref.extract('nssm-2.24/win64/nssm.exe', '.')
+        shutil.move('nssm-2.24/win64/nssm.exe', 'dist/nssm.exe')
+        shutil.rmtree('nssm-2.24', ignore_errors=True)
+        os.remove('nssm.zip')
+        print("NSSM downloaded successfully!")
+    except Exception as e:
+        print(f"Warning: NSSM download failed: {e}")
+    
     # Build installer with NSIS
     try:
         import subprocess
