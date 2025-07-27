@@ -9,11 +9,12 @@ A lightweight RMM system for monitoring machine connectivity, executing remote c
 - **Remote Command Execution**: Execute commands on any connected machine
 - **Automatic Updates**: Fully automated update system via GitHub releases
 - **Web Dashboard**: Modern interface with system information display
-- **System Tray Control**: Windows tray icon and Linux control app
+- **Optional Control Apps**: Windows tray icon and Linux control app
 - **Scalable UI**: Card and table views for 100+ machines
 - **Offline Detection**: Real-time alerts when machines disconnect
 - **System Information**: Hardware specs, uptime, process counts
-- **Enterprise-grade**: Built for scalability and reliability
+- **Discord Alerts**: Notifications for offline machines, high usage, and uninstalls
+- **Agent Uninstall**: Remote uninstall capability via dashboard
 
 ## Quick Start
 
@@ -36,53 +37,54 @@ Server runs on http://localhost:3000
 
 ### 4. Install Agents
 
-**Option A - Download Executables (Recommended):**
-- Download `syswatch-agent-installer.exe` (Windows) or `syswatch-agent-installer-linux` (Linux) from [Releases](https://github.com/wslabn/nxtclone/releases)
-- Windows: Run installer as administrator
-- Linux: `sudo ./syswatch-agent-installer-linux ws://your-server:3000`
+**Windows:**
+1. Download `syswatch-agent-installer.exe` from [Releases](https://github.com/wslabn/nxtclone/releases)
+2. Run as administrator
+3. Enter server URL (e.g., `ws://192.168.1.100:3000`)
+4. Choose whether to install system tray control app
+5. Agent installs as Windows service and starts automatically
 
-**Option B - Run from Source:**
+**Linux:**
+1. Download `syswatch-agent-installer-linux` from [Releases](https://github.com/wslabn/nxtclone/releases)
+2. Run: `sudo ./syswatch-agent-installer-linux ws://192.168.1.100:3000`
+3. Choose whether to install control application
+4. Agent installs as systemd service and starts automatically
+
+**Manual Execution (Development):**
 ```bash
 cd agents
 pip install -r requirements.txt
 
 # Windows
-python windows_agent.py
+python windows_agent.py ws://your-server:3000
 
 # Linux  
-python3 linux_agent.py
-
-# Custom server URL
-python windows_agent.py ws://your-server:3000
+python3 linux_agent.py ws://your-server:3000
 ```
 
 ## Usage
 
 1. **Dashboard Access**: Open http://localhost:3000 in your browser
-2. **Deploy Agents**: Install executables or run from source on target machines
+2. **Deploy Agents**: Install using the installers on target machines
 3. **Monitor Systems**: View real-time metrics, system info, and status
 4. **Execute Commands**: Send commands remotely via web interface
 5. **Auto-Updates**: System automatically updates from GitHub releases
 6. **Offline Monitoring**: Get alerts when machines disconnect
+7. **Remote Uninstall**: Uninstall agents remotely via dashboard
 
-## Agent Installation
+## Control Applications
 
-**Windows Service Installation:**
-1. Download `syswatch-agent-installer.exe` from releases
-2. Run as administrator
-3. Enter server URL when prompted (e.g., `ws://192.168.1.100:3000`)
-4. Agent installs as Windows service and starts automatically
-5. Optional: Run `syswatch-tray.exe` for system tray control
+**Windows Tray App:**
+- Optional installation during agent setup
+- System tray icon with right-click menu
+- Change server URL, restart service, view logs
+- Desktop shortcut created if installed
 
-**Linux Service Installation:**
-1. Download `syswatch-agent-installer-linux` from releases
-2. Run: `sudo ./syswatch-agent-installer-linux ws://192.168.1.100:3000`
-3. Agent installs as systemd service and starts automatically
-4. Optional: Run `./syswatch-control` for GUI/CLI management
-
-**Manual Execution:**
-- Windows: `syswatch-agent.exe`
-- Linux: `./syswatch-agent`
+**Linux Control App:**
+- Optional installation during agent setup
+- Available system-wide as `syswatch-control`
+- GUI (if available) or CLI interface
+- Manage service, view logs, change configuration
 
 ## Architecture
 
@@ -114,6 +116,7 @@ python windows_agent.py ws://your-server:3000
 - **Services**: List system services and their status
 - **Network**: Display network configuration and connections
 - **Software**: Show installed software and agent version
+- **Uninstall**: Remove agent from remote machine
 
 ## Auto-Update System
 
@@ -123,8 +126,16 @@ python windows_agent.py ws://your-server:3000
 - **Real-time Progress**: Dashboard shows update status and progress
 - **Service Integration**: Windows services and Linux systemd units restart automatically
 - **Version Management**: Synchronized versioning across all components
+- **Control App Updates**: Tray and control apps update automatically with agent
 - **Enterprise Ready**: GitHub Actions for automated release management
-- **Local Triggers**: Force updates locally via service restart or trigger files
+
+## Discord Notifications
+
+Configure Discord webhook in admin panel for alerts:
+- **Machine Offline**: When agents disconnect
+- **Machine Online**: When agents reconnect
+- **High Resource Usage**: CPU/Memory/Disk above 89%
+- **Agent Uninstalled**: When agents are removed remotely
 
 ## Building Executables
 
@@ -150,7 +161,6 @@ chmod +x build-all.sh
 
 This is a basic implementation. For production use, add:
 - Authentication/authorization
-<<<<<<< HEAD
 - TLS encryption (WSS://)
 - Command validation and sandboxing
 - Rate limiting and DDoS protection
@@ -163,7 +173,7 @@ This is a basic implementation. For production use, add:
 Create releases via GitHub Actions:
 1. Go to Actions → "Manual Release"
 2. Click "Run workflow"
-3. Enter version (e.g., "1.0.1")
+3. Enter version (e.g., "1.2.11")
 4. Automatically builds executables and creates release
 
 ## Troubleshooting
@@ -197,27 +207,10 @@ MIT License - see LICENSE file for details
 - **Update Management**: Check for updates and monitor progress
 - **Quick Actions**: Pre-configured system management buttons
 - **Software Inventory**: View installed programs and versions
-- **System Tray Control**: Windows tray icon and Linux control app
-
-## Documentation
-
-- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
-- **[Installation Guide](#agent-installation)** - Step-by-step setup instructions
-- **[API Documentation](#command-examples)** - Command examples and usage
-
-## System Tray Control
-
-**Windows:**
-- Run `syswatch-tray.exe` for system tray icon
-- Right-click menu: Change server, restart service, view logs, about
-- Persistent configuration storage
-
-**Linux:**
-- Run `./syswatch-control` for GUI (if available) or CLI interface
-- Auto-detects GUI availability, falls back to terminal menu
-- Same features: server config, service control, log viewing
+- **Remote Uninstall**: Remove agents from dashboard
+- **Discord Integration**: Real-time notifications and alerts
 
 ## Project Stats
 - Total Code Files: 15
 - Last Updated: 2025-01-25
-- Current Version: 1.2.10
+- Current Version: 1.2.11

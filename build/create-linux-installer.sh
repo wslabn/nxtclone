@@ -21,6 +21,13 @@ mkdir -p "$TEMP_DIR/syswatch"
 cp dist/syswatch-agent "$TEMP_DIR/syswatch/"
 # Rename for installer compatibility
 mv "$TEMP_DIR/syswatch/syswatch-agent" "$TEMP_DIR/syswatch/syswatch-agent-linux"
+
+# Copy control app if it exists
+if [ -f "dist/syswatch-control" ]; then
+    cp dist/syswatch-control "$TEMP_DIR/syswatch/"
+    echo "Including control app in installer"
+fi
+
 cp ../agents/*.py "$TEMP_DIR/syswatch/"
 cp ../agents/version.txt "$TEMP_DIR/syswatch/"
 

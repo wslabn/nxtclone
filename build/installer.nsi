@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 9
+!define VERSIONBUILD 11
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -25,6 +25,8 @@ Var Dialog
 Var ServerUrlLabel
 Var ServerUrlText
 Var ServerUrl
+Var TrayCheckbox
+Var InstallTray
 
 Page custom ServerUrlPage ServerUrlPageLeave
 Page instfiles
@@ -45,6 +47,10 @@ Function ServerUrlPage
 
     ${NSD_CreateText} 0 40u 100% 12u "ws://localhost:3000"
     Pop $ServerUrlText
+    
+    ${NSD_CreateCheckbox} 0 60u 100% 12u "Install system tray control application (optional)"
+    Pop $TrayCheckbox
+    ${NSD_Check} $TrayCheckbox
 
     nsDialogs::Show
 FunctionEnd
@@ -62,6 +68,8 @@ Function ServerUrlPageLeave
         MessageBox MB_OK "Server URL must start with 'ws://'"
         Abort
     ${EndIf}
+    
+    ${NSD_GetState} $TrayCheckbox $InstallTray
 FunctionEnd
 
 Section "install"
@@ -69,6 +77,13 @@ Section "install"
     
     # Copy the agent executable
     File "dist\syswatch-agent-windows.exe"
+    
+    # Copy the tray application if user selected it
+    ${If} $InstallTray == ${BST_CHECKED}
+        File /nonfatal "dist\syswatch-tray.exe"
+        # Create desktop shortcut for tray app
+        CreateShortCut "$DESKTOP\SysWatch Tray.lnk" "$INSTDIR\syswatch-tray.exe"
+    ${EndIf}
     
     # Verify file was copied
     IfFileExists "$INSTDIR\syswatch-agent-windows.exe" +2 0
@@ -104,7 +119,11 @@ Section "install"
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "NoRepair" 1
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "EstimatedSize" ${INSTALLSIZE}
     
-    MessageBox MB_OK "Installation complete! The SysWatch Agent service has been installed."
+    ${If} $InstallTray == ${BST_CHECKED}
+        MessageBox MB_OK "Installation complete! The SysWatch Agent service and tray application have been installed.$\n$\nA desktop shortcut has been created for the tray app."
+    ${Else}
+        MessageBox MB_OK "Installation complete! The SysWatch Agent service has been installed."
+    ${EndIf}
 SectionEnd
 
 Section "uninstall"
@@ -114,7 +133,9 @@ Section "uninstall"
     
     # Remove files
     Delete "$INSTDIR\syswatch-agent-windows.exe"
+    Delete "$INSTDIR\syswatch-tray.exe"
     Delete "$INSTDIR\uninstall.exe"
+    Delete "$DESKTOP\SysWatch Tray.lnk"
     RMDir "$INSTDIR"
     
     # Remove registry entries

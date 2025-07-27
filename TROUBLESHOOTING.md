@@ -1,293 +1,370 @@
 # SysWatch Troubleshooting Guide
 
-## Agent Connection Issues
+## Installation Issues
 
-### Check Agent Status
+### Windows Installer
 
-**Linux:**
+**Error 1053 - Service won't start:**
+```
+Solution: Ensure you're running installer as administrator
+Check: Service executable path is correct in Services.msc
+```
+
+**Installer fails to run:**
+```
+Solution: Right-click installer → "Run as administrator"
+Check: Windows Defender/antivirus isn't blocking
+```
+
+**Service installed but not connecting:**
+```
+Check: Windows Firewall isn't blocking outbound connections
+Verify: Server URL format is correct (ws://server:3000)
+Test: Try manual execution first: syswatch-agent-windows.exe ws://server:3000
+```
+
+### Linux Installer
+
+**Permission denied:**
+```bash
+sudo chmod +x syswatch-agent-installer-linux
+sudo ./syswatch-agent-installer-linux ws://server:3000
+```
+
+**Service fails to start:**
 ```bash
 # Check service status
-systemctl status syswatch-agent
+sudo systemctl status syswatch-agent
 
-# View recent logs
-journalctl -u syswatch-agent -n 50
+# View logs
+sudo journalctl -u syswatch-agent -f
 
-# Follow logs in real-time
-journalctl -u syswatch-agent -f
-
-# Check if agent is running
-ps aux | grep syswatch
-
-# Use control application
-./syswatch-control
+# Manual test
+sudo -u syswatch /opt/syswatch/syswatch-agent-linux ws://server:3000
 ```
 
-**Windows:**
-```cmd
-# Check service status
-sc query "SysWatch Agent"
+**Control app not found after installation:**
+```bash
+# Check if symlink exists
+ls -la /usr/local/bin/syswatch-control
 
-# View service details
-sc queryex "SysWatch Agent"
-
-# Check running processes
-tasklist | findstr syswatch
-
-# Use tray application
-syswatch-tray.exe
+# Manual execution
+/opt/syswatch/syswatch-control
 ```
+
+## Connection Issues
 
 ### Agent Not Connecting
 
-1. **Check server URL in agent configuration**
-2. **Verify network connectivity:**
-   ```bash
-   # Test connection to server
-   telnet your-server-ip 3000
-   # or
-   nc -zv your-server-ip 3000
-   ```
-3. **Check firewall settings** - Port 3000 must be open
-4. **Restart agent service:**
-   - Linux: `sudo systemctl restart syswatch-agent` or use `./syswatch-control`
-   - Windows: `sc stop "SysWatch Agent" && sc start "SysWatch Agent"` or use tray app
+**Check server URL format:**
+```
+Correct: ws://192.168.1.100:3000
+Incorrect: http://192.168.1.100:3000
+Incorrect: 192.168.1.100:3000
+```
+
+**Firewall blocking connection:**
+```bash
+# Windows: Allow outbound on port 3000
+# Linux: Check iptables/ufw rules
+sudo ufw allow out 3000
+```
+
+**Server not running:**
+```bash
+# Start server
+cd /path/to/syswatch
+npm start
+
+# Check if port is open
+netstat -an | grep :3000
+```
+
+### Agent Shows Offline
+
+**Check heartbeat timing:**
+- Agents send heartbeat every 15 seconds
+- Server marks offline after 30 seconds
+- Network delays can cause false offline status
+
+**Service stopped:**
+```bash
+# Windows
+sc query "SysWatch Agent"
+sc start "SysWatch Agent"
+
+# Linux
+sudo systemctl status syswatch-agent
+sudo systemctl start syswatch-agent
+```
 
 ## Auto-Update Issues
 
-### Check Agent Version
+### Updates Not Working
 
-**Linux:**
+**Check GitHub connectivity:**
 ```bash
-cat /opt/syswatch/version.txt
-# or use control app
-./syswatch-control
+# Test from agent machine
+curl -I https://api.github.com/repos/wslabn/nxtclone/releases/latest
 ```
+
+**Agent version too old:**
+- Agents before v1.2.8 may have update issues
+- Manually reinstall with latest installer
+
+**Service permissions:**
+```bash
+# Windows: Service must run as SYSTEM or admin
+# Linux: Service runs as syswatch user with proper permissions
+```
+
+### Update Fails Mid-Process
 
 **Windows:**
 ```cmd
-type "C:\Program Files\SysWatch\SysWatch Agent\version.txt"
-# or use tray app
-syswatch-tray.exe
+# Stop service
+sc stop "SysWatch Agent"
+
+# Check for .old/.new files in install directory
+dir "C:\Program Files\SysWatch"
+
+# Restart service
+sc start "SysWatch Agent"
 ```
 
-### Update Troubleshooting
+**Linux:**
+```bash
+# Stop service
+sudo systemctl stop syswatch-agent
 
-1. **Check GitHub connectivity:**
-   ```bash
-   curl -I https://api.github.com/repos/wslabn/nxtclone/releases/latest
-   ```
+# Check for backup files
+ls -la /opt/syswatch/
 
-2. **Manual update trigger (Linux):**
-   ```bash
-   sudo touch /tmp/syswatch-update-now
-   ```
-
-3. **View update logs:**
-   - **Server:** Admin Panel → View Update Logs
-   - **Linux:** `journalctl -u syswatch-agent -f` or `./syswatch-control`
-   - **Windows:** Event Viewer → Application → SysWatch Agent or tray app
-
-4. **Force agent reinstall if updates fail:**
-   - Download latest release from GitHub
-   - Reinstall agent with new executable
+# Restart service
+sudo systemctl start syswatch-agent
+```
 
 ## Dashboard Issues
 
-### Authentication Problems
+### Can't Access Dashboard
 
-1. **Reset admin password:**
-   ```bash
-   # Delete auth database and restart server
-   rm server/auth.db
-   npm start
-   # Default: admin/admin
-   ```
+**Server not running:**
+```bash
+npm start
+# Should show: RMM Server running on port 3000
+```
 
-2. **Clear browser cache** - Hard refresh (Ctrl+F5)
+**Wrong URL:**
+```
+Correct: http://localhost:3000
+Check: Server IP if accessing remotely
+```
 
-3. **Check session cookies** - Clear site data in browser
+**Authentication issues:**
+```
+Default login: admin/admin
+Reset: Delete server/users.json and restart server
+```
 
-### Machines Not Appearing
+### Machines Not Showing
 
-1. **Check agent logs** for connection errors
-2. **Verify server is running** on correct port
-3. **Check database:**
-   ```bash
-   # View machines table
-   sqlite3 server/database.db "SELECT * FROM machines;"
-   ```
+**Check agent logs:**
+```bash
+# Windows
+# Check Windows Event Viewer or service logs
+
+# Linux
+sudo journalctl -u syswatch-agent -f
+```
+
+**Database issues:**
+```bash
+# Delete database to reset
+rm server/rmm.db
+# Restart server - will recreate database
+```
+
+## Command Execution Issues
+
+### Commands Fail to Execute
+
+**Permission issues:**
+```
+Windows: Service runs as SYSTEM - has admin rights
+Linux: Service runs as syswatch user - limited permissions
+```
+
+**Command syntax:**
+```bash
+# Windows: Use cmd syntax
+dir C:\
+systeminfo
+
+# Linux: Use bash syntax
+ls -la /
+ps aux
+```
+
+**Timeout issues:**
+- Commands timeout after 30 seconds
+- Use shorter commands or background execution
+
+### No Command Results
+
+**Check agent connection:**
+- Agent must be online to receive commands
+- Check WebSocket connection status
+
+**Result retrieval:**
+- Results stored temporarily in server memory
+- Refresh page if results don't appear
+
+## Control App Issues
+
+### Windows Tray App
+
+**Tray icon not appearing:**
+```
+Check: Windows notification area settings
+Run: syswatch-tray.exe manually to test
+Restart: Windows Explorer process
+```
+
+**Can't change server URL:**
+```
+Run as administrator: Right-click → "Run as administrator"
+Check: Registry permissions for current user
+```
+
+### Linux Control App
+
+**Command not found:**
+```bash
+# Check symlink
+ls -la /usr/local/bin/syswatch-control
+
+# Run directly
+/opt/syswatch/syswatch-control
+```
+
+**GUI not working:**
+```bash
+# Check if GUI libraries available
+python3 -c "import tkinter"
+
+# Falls back to CLI if GUI unavailable
+```
+
+## Discord Notifications
+
+### Alerts Not Sending
+
+**Webhook URL incorrect:**
+```
+Check: Discord webhook URL format
+Test: Send test message from admin panel
+```
+
+**Network connectivity:**
+```bash
+# Test from server
+curl -X POST [webhook-url] -H "Content-Type: application/json" -d '{"content":"test"}'
+```
+
+**Rate limiting:**
+- Discord has rate limits on webhooks
+- Server respects limits automatically
 
 ## Performance Issues
 
 ### High Resource Usage
 
-1. **Check metrics collection interval** (default: 15 seconds)
-2. **Database cleanup:**
-   ```bash
-   # Clean old metrics (keeps 7 days)
-   sqlite3 server/database.db "DELETE FROM metrics WHERE timestamp < strftime('%s', 'now', '-7 days') * 1000;"
-   ```
+**Server performance:**
+```bash
+# Check server resources
+top
+htop
 
-3. **Restart server** to clear memory leaks
+# Reduce update frequency if needed
+# Edit heartbeat interval in agent code
+```
 
-### Slow Dashboard Loading
+**Agent performance:**
+```bash
+# Check agent resource usage
+ps aux | grep syswatch
+```
 
-1. **Check network latency** between browser and server
-2. **Reduce update frequency** in dashboard (default: 10 seconds)
-3. **Clear browser cache**
+**Database size:**
+```bash
+# Check database size
+ls -lh server/rmm.db
 
-## Command Execution Issues
+# Clean old data (automatic after 7 days)
+```
 
-### Commands Timing Out
+## Uninstall Issues
 
-1. **Increase timeout** in agent code (default: 30 seconds)
-2. **Check command syntax** for target platform
-3. **Verify permissions** - some commands need admin/sudo
+### Remote Uninstall Fails
 
-### Commands Not Executing
+**Agent doesn't support uninstall:**
+- Feature added in v1.2.8+
+- Older agents need manual uninstall
 
-1. **Check agent status** - must be online
-2. **View command history** in database:
-   ```bash
-   sqlite3 server/database.db "SELECT * FROM command_history ORDER BY timestamp DESC LIMIT 10;"
-   ```
+**Permission issues:**
+```bash
+# Windows: Service needs admin rights
+# Linux: Service needs sudo access for uninstall
+```
 
-## Network Issues
+### Manual Uninstall
 
-### Port Configuration
+**Windows:**
+```cmd
+sc stop "SysWatch Agent"
+sc delete "SysWatch Agent"
+rmdir /s /q "C:\Program Files\SysWatch"
+```
 
-- **Server Port:** 3000 (HTTP/WebSocket)
-- **Agent Connection:** WebSocket to server:3000
-- **Firewall Rules:** Allow inbound 3000 on server
-
-### WebSocket Connection Failures
-
-1. **Check proxy/load balancer settings**
-2. **Verify WebSocket support** in network infrastructure
-3. **Test direct connection** bypassing proxies
-
-## Database Issues
-
-### Corrupt Database
-
-1. **Backup current database:**
-   ```bash
-   cp server/database.db server/database.db.backup
-   ```
-
-2. **Check database integrity:**
-   ```bash
-   sqlite3 server/database.db "PRAGMA integrity_check;"
-   ```
-
-3. **Recreate database** if corrupted:
-   ```bash
-   rm server/database.db
-   npm start  # Will recreate tables
-   ```
+**Linux:**
+```bash
+sudo systemctl stop syswatch-agent
+sudo systemctl disable syswatch-agent
+sudo rm -f /etc/systemd/system/syswatch-agent.service
+sudo systemctl daemon-reload
+sudo rm -rf /opt/syswatch
+sudo rm -f /usr/local/bin/syswatch-control
+sudo userdel syswatch
+```
 
 ## Log Locations
 
-### Server Logs
-- **Console output** when running `npm start`
-- **Admin Panel** → View Update Logs
-- **PM2 logs** (if using PM2): `pm2 logs nxtclone`
+**Server logs:**
+- Console output when running `npm start`
+- Admin panel → Logs section
 
-### Agent Logs
+**Windows agent logs:**
+- Windows Event Viewer
+- Service logs in system events
 
-**Linux:**
-- **systemd:** `journalctl -u nxtclone-agent`
-- **Manual run:** Console output
-
-**Windows:**
-- **Event Viewer:** Application → NxtClone Agent
-- **Service logs:** Windows Event Log
-
-## Common Error Messages
-
-### "Authentication required"
-- **Solution:** Login with admin credentials or clear browser cache
-
-### "Machine not found"
-- **Solution:** Check agent connection, restart agent service
-
-### "Command execution failed"
-- **Solution:** Verify command syntax, check agent permissions
-
-### "Update failed: repo not found"
-- **Solution:** Reinstall agent with latest version from GitHub releases
-
-### "Service not found" or "Permission denied"
-- **Solution:** Run tray/control apps as administrator (Windows) or with sudo (Linux)
-
-### "WebSocket connection failed"
-- **Solution:** Check server status, firewall settings, network connectivity
-
-## System Tray/Control Applications
-
-### Windows Tray Not Appearing
-1. **Check if running:** `tasklist | findstr syswatch-tray`
-2. **Run as administrator** if service control needed
-3. **Check system tray settings** - may be hidden
-
-### Linux Control App Issues
-1. **GUI not available:** App automatically falls back to CLI mode
-2. **Permission errors:** Use `sudo` for service operations
-3. **Missing dependencies:** Install `python3-tk` for GUI support
-
-### Tray App Features
-- **Change Server:** Updates agent configuration
-- **Restart Service:** Requires admin/sudo privileges
-- **View Logs:** Opens system log viewer
-- **About:** Shows version and configuration
+**Linux agent logs:**
+```bash
+sudo journalctl -u syswatch-agent -f
+sudo journalctl -u syswatch-agent --since "1 hour ago"
+```
 
 ## Getting Help
 
-1. **Use tray/control apps** for quick diagnostics and management
-2. **Check server console** for error messages
-3. **View agent logs** using commands above or tray apps
-4. **Check GitHub Issues:** https://github.com/wslabn/nxtclone/releases
-5. **Collect diagnostic info:**
-   - Server version
-   - Agent version (available in tray/control apps)
-   - Operating system
-   - Error messages
-   - Network configuration
+1. **Check logs first** - Most issues show in logs
+2. **Test connectivity** - Ensure network access
+3. **Verify versions** - Use latest releases
+4. **Manual testing** - Run agents manually to debug
+5. **GitHub Issues** - Report bugs with logs
 
-## Diagnostic Commands
+## Common Error Codes
 
-### Server Health Check
-```bash
-# Check server process
-ps aux | grep node
-
-# Check port binding
-netstat -tlnp | grep 3000
-
-# Check database
-sqlite3 server/database.db ".tables"
-```
-
-### Agent Health Check
-```bash
-# Linux
-systemctl is-active syswatch-agent
-systemctl is-enabled syswatch-agent
-./syswatch-control  # GUI/CLI interface
-
-# Windows
-sc query "SysWatch Agent"
-syswatch-tray.exe  # System tray control
-```
-
-### Network Connectivity
-```bash
-# Test server reachability
-ping your-server-ip
-
-# Test port connectivity
-telnet your-server-ip 3000
-
-# Check DNS resolution
-nslookup your-server-hostname
-```
+- **1053**: Windows service executable not found
+- **1077**: Windows service path invalid
+- **Connection refused**: Server not running or firewall blocking
+- **404**: Update URL incorrect or release not found
+- **Timeout**: Network connectivity issues

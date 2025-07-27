@@ -30,6 +30,13 @@ if [ -z "$SERVER_URL" ]; then
     exit 1
 fi
 
+# Ask about control app installation
+INSTALL_CONTROL="n"
+if [ -f "syswatch/syswatch-control" ]; then
+    read -p "Install control application for GUI/CLI management? (y/n) [y]: " INSTALL_CONTROL
+    INSTALL_CONTROL=${INSTALL_CONTROL:-y}
+fi
+
 echo "Installing SysWatch Agent..."
 echo "Server URL: $SERVER_URL"
 
@@ -51,6 +58,14 @@ AGENT_FILES_END
 # Set permissions
 chown -R "$AGENT_USER:$AGENT_USER" "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR/syswatch-agent-linux"
+
+# Install control app if requested
+if [ "$INSTALL_CONTROL" = "y" ] && [ -f "$INSTALL_DIR/syswatch-control" ]; then
+    chmod +x "$INSTALL_DIR/syswatch-control"
+    # Create symlink in /usr/local/bin for easy access
+    ln -sf "$INSTALL_DIR/syswatch-control" /usr/local/bin/syswatch-control
+    echo "Control app installed: run 'syswatch-control' from anywhere"
+fi
 
 # Create systemd service
 cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
@@ -84,5 +99,8 @@ echo "Installation completed successfully!"
 echo "Service: $SERVICE_NAME"
 echo "Status: systemctl status $SERVICE_NAME"
 echo "Logs: journalctl -u $SERVICE_NAME -f"
+if [ "$INSTALL_CONTROL" = "y" ] && [ -f "$INSTALL_DIR/syswatch-control" ]; then
+    echo "Control app: syswatch-control"
+fi
 echo ""
 echo "The agent is now running and will start automatically on boot."

@@ -121,9 +121,15 @@ class AgentUpdater:
                 # Windows: rename current, move new
                 os.rename(current_exe, current_exe + ".old")
                 os.rename(current_exe + ".new", current_exe)
+                
+                # Update tray app if it exists
+                self.update_tray_app_if_exists()
             else:
                 # Linux: direct replace
                 os.rename(current_exe + ".new", current_exe)
+                
+                # Update control app if it exists
+                self.update_control_app_if_exists()
             
             print("Executable updated successfully")
             return True
@@ -171,6 +177,59 @@ class AgentUpdater:
         except Exception as e:
             print(f"Source update failed: {e}")
             return False
+    
+    def update_tray_app_if_exists(self):
+        """Update Windows tray app if it exists"""
+        try:
+            install_dir = os.path.dirname(sys.argv[0])
+            tray_path = os.path.join(install_dir, "syswatch-tray.exe")
+            
+            if os.path.exists(tray_path):
+                print("Updating tray application...")
+                # Download latest tray app
+                url = f"https://github.com/{self.repo_owner}/{self.repo_name}/releases/latest/download/syswatch-tray.exe"
+                response = requests.get(url, timeout=30)
+                response.raise_for_status()
+                
+                # Replace tray app
+                backup_path = tray_path + ".backup"
+                shutil.copy2(tray_path, backup_path)
+                
+                with open(tray_path + ".new", 'wb') as f:
+                    f.write(response.content)
+                
+                os.rename(tray_path, tray_path + ".old")
+                os.rename(tray_path + ".new", tray_path)
+                print("Tray application updated successfully")
+        except Exception as e:
+            print(f"Tray app update failed: {e}")
+    
+    def update_control_app_if_exists(self):
+        """Update Linux control app if it exists"""
+        try:
+            install_dir = os.path.dirname(sys.argv[0])
+            control_path = os.path.join(install_dir, "syswatch-control")
+            
+            if os.path.exists(control_path):
+                print("Updating control application...")
+                # Download latest control app
+                url = f"https://github.com/{self.repo_owner}/{self.repo_name}/releases/latest/download/syswatch-control"
+                response = requests.get(url, timeout=30)
+                response.raise_for_status()
+                
+                # Replace control app
+                backup_path = control_path + ".backup"
+                shutil.copy2(control_path, backup_path)
+                
+                with open(control_path + ".new", 'wb') as f:
+                    f.write(response.content)
+                
+                os.chmod(control_path + ".new", 0o755)
+                os.rename(control_path, control_path + ".old")
+                os.rename(control_path + ".new", control_path)
+                print("Control application updated successfully")
+        except Exception as e:
+            print(f"Control app update failed: {e}")
     
     def restart_agent(self):
         """Restart the current agent process"""
