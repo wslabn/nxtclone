@@ -22,7 +22,7 @@ jobs:
         python build-windows.py
     
     - name: Upload Windows artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: windows-executables
         path: build/dist/*.exe
@@ -45,7 +45,7 @@ jobs:
         ./create-linux-installer.sh
     
     - name: Upload Linux artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux-executables
         path: |
@@ -71,13 +71,13 @@ jobs:
       run: npm install
     
     - name: Download Windows artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: windows-executables
         path: ./windows-build/
     
     - name: Download Linux artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: linux-executables
         path: ./linux-build/
