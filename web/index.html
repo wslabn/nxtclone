@@ -83,6 +83,63 @@
         </div>
     </div>
 
+    <!-- Alerts Configuration Modal -->
+    <div id="alertsModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="alertsModalTitle">Configure Alerts</h3>
+                    <button class="modal-close" onclick="closeAlertsModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="alertsForm">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="alertsEnabled" style="margin-right: 0.5rem;">
+                                Enable Alerts for this Machine
+                            </label>
+                        </div>
+                        
+                        <div id="alertsConfig" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">CPU Usage Alert (%)</label>
+                                <input type="number" id="cpuThreshold" class="form-input" min="1" max="100" value="90">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Memory Usage Alert (%)</label>
+                                <input type="number" id="memoryThreshold" class="form-input" min="1" max="100" value="90">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Disk Usage Alert (%)</label>
+                                <input type="number" id="diskThreshold" class="form-input" min="1" max="100" value="90">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" id="offlineAlert" style="margin-right: 0.5rem;">
+                                    Alert when machine goes offline
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" id="onlineAlert" style="margin-right: 0.5rem;">
+                                    Alert when machine comes back online
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeAlertsModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveAlerts()">Save Alerts</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let machines = [];
         let groups = {};
@@ -298,6 +355,7 @@
                     <button onclick="quickAction('${machine.id}', 'network')" ${disabled ? 'disabled' : ''} class="btn btn-secondary btn-sm">Network</button>
                     <button onclick="quickAction('${machine.id}', 'software')" ${disabled ? 'disabled' : ''} class="btn btn-secondary btn-sm">Software</button>
                     ${isWindows ? `<button onclick="quickAction('${machine.id}', 'winupdates')" ${disabled ? 'disabled' : ''} class="btn btn-info btn-sm">Win Updates</button>` : ''}
+                    <button onclick="showAlertsModal('${machine.id}')" class="btn btn-secondary btn-sm">Alerts</button>
                     <button onclick="updateSingleAgent('${machine.id}')" ${disabled ? 'disabled' : ''} class="btn btn-warning btn-sm">Update</button>
                     <button onclick="uninstallAgent('${machine.id}')" ${disabled ? 'disabled' : ''} class="btn btn-danger btn-sm">Uninstall</button>
                 </div>
@@ -609,6 +667,83 @@
         function closeModal() {
             document.getElementById('commandModal').style.display = 'none';
         }
+        
+        // Alerts configuration
+        let currentAlertMachineId = null;
+        
+        async function showAlertsModal(machineId) {
+            currentAlertMachineId = machineId;
+            const machine = machines.find(m => m.id === machineId);
+            
+            document.getElementById('alertsModalTitle').textContent = `Configure Alerts - ${machine.hostname}`;
+            
+            // Load current alert settings
+            try {
+                const response = await fetch(`/api/machine-alerts/${machineId}`);
+                const alerts = await response.json();
+                
+                document.getElementById('alertsEnabled').checked = alerts.enabled || false;
+                document.getElementById('cpuThreshold').value = alerts.cpuThreshold || 90;
+                document.getElementById('memoryThreshold').value = alerts.memoryThreshold || 90;
+                document.getElementById('diskThreshold').value = alerts.diskThreshold || 90;
+                document.getElementById('offlineAlert').checked = alerts.offlineAlert !== false;
+                document.getElementById('onlineAlert').checked = alerts.onlineAlert || false;
+                
+                toggleAlertsConfig();
+            } catch (error) {
+                // Default values if no settings exist
+                document.getElementById('alertsEnabled').checked = false;
+                document.getElementById('cpuThreshold').value = 90;
+                document.getElementById('memoryThreshold').value = 90;
+                document.getElementById('diskThreshold').value = 90;
+                document.getElementById('offlineAlert').checked = true;
+                document.getElementById('onlineAlert').checked = false;
+                toggleAlertsConfig();
+            }
+            
+            document.getElementById('alertsModal').style.display = 'block';
+        }
+        
+        function toggleAlertsConfig() {
+            const enabled = document.getElementById('alertsEnabled').checked;
+            document.getElementById('alertsConfig').style.display = enabled ? 'block' : 'none';
+        }
+        
+        async function saveAlerts() {
+            if (!currentAlertMachineId) return;
+            
+            const alertConfig = {
+                enabled: document.getElementById('alertsEnabled').checked,
+                cpuThreshold: parseInt(document.getElementById('cpuThreshold').value),
+                memoryThreshold: parseInt(document.getElementById('memoryThreshold').value),
+                diskThreshold: parseInt(document.getElementById('diskThreshold').value),
+                offlineAlert: document.getElementById('offlineAlert').checked,
+                onlineAlert: document.getElementById('onlineAlert').checked
+            };
+            
+            try {
+                const response = await fetch(`/api/machine-alerts/${currentAlertMachineId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(alertConfig)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Alert configuration saved successfully');
+                    closeAlertsModal();
+                } else {
+                    alert('Failed to save alert configuration: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error saving alert configuration: ' + error.message);
+            }
+        }
+        
+        function closeAlertsModal() {
+            document.getElementById('alertsModal').style.display = 'none';
+            currentAlertMachineId = null;
+        }
 
         function logout() {
             fetch('/api/logout', { method: 'POST' })
@@ -670,9 +805,106 @@
             document.getElementById('all-count').textContent = `${allOnline}/${machines.length} machines`;
         }
         
-        // Placeholder function for metric graphs
-        function showMetricGraph(machineId, metricType, hostname) {
-            alert('Metric graphs feature coming soon');
+        // Metric graphs
+        async function showMetricGraph(machineId, metricType, hostname) {
+            try {
+                const response = await fetch(`/api/metrics/${machineId}`);
+                const metrics = await response.json();
+                
+                if (metrics.error) {
+                    alert('Failed to load metrics: ' + metrics.error);
+                    return;
+                }
+                
+                const labels = metrics.map(m => new Date(m.timestamp).toLocaleString());
+                let data, label, color;
+                
+                switch(metricType) {
+                    case 'cpu':
+                        data = metrics.map(m => m.cpu_percent);
+                        label = 'CPU Usage (%)';
+                        color = 'var(--warning)';
+                        break;
+                    case 'memory':
+                        data = metrics.map(m => m.memory_percent);
+                        label = 'Memory Usage (%)';
+                        color = 'var(--success)';
+                        break;
+                    case 'disk':
+                        data = metrics.map(m => m.disk_percent);
+                        label = 'Disk Usage (%)';
+                        color = 'var(--danger)';
+                        break;
+                    case 'process':
+                        data = metrics.map(m => m.process_count);
+                        label = 'Process Count';
+                        color = 'var(--info)';
+                        break;
+                }
+                
+                showGraphModal(hostname, label, labels, data, color);
+                
+            } catch (error) {
+                alert('Failed to load metric graph: ' + error.message);
+            }
+        }
+        
+        function showGraphModal(hostname, label, labels, data, color) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            modal.innerHTML = `
+                <div class="modal-dialog" style="max-width: 800px;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 class="modal-title">${hostname} - ${label} (Last 24 Hours)</h3>
+                            <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <canvas id="metricChart" style="max-height: 400px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Close on outside click
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.remove();
+            };
+            
+            // Create chart
+            const ctx = document.getElementById('metricChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: label.includes('%') ? 100 : undefined
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    }
+                }
+            });
         }
 
         // Initialize
@@ -686,13 +918,21 @@
                 renderGroups();
             }, 10000);
             
-            // Close modal on outside click
+            // Close modals on outside click
             window.onclick = function(event) {
-                const modal = document.getElementById('commandModal');
-                if (event.target === modal) {
+                const commandModal = document.getElementById('commandModal');
+                const alertsModal = document.getElementById('alertsModal');
+                
+                if (event.target === commandModal) {
                     closeModal();
                 }
+                if (event.target === alertsModal) {
+                    closeAlertsModal();
+                }
             };
+            
+            // Add event listener for alerts checkbox
+            document.getElementById('alertsEnabled').addEventListener('change', toggleAlertsConfig);
         });
     </script>
 </body>
