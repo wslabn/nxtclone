@@ -467,6 +467,28 @@ class RMMServer {
       }
     });
     
+    // Machine Alerts API
+    this.app.get('/api/machine-alerts/:machineId', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const { machineId } = req.params;
+        const alerts = await this.db.getMachineAlerts(machineId);
+        res.json(alerts || { enabled: false, cpuThreshold: 90, memoryThreshold: 90, diskThreshold: 90, offlineAlert: true, onlineAlert: false });
+      } catch (error) {
+        res.json({ enabled: false, cpuThreshold: 90, memoryThreshold: 90, diskThreshold: 90, offlineAlert: true, onlineAlert: false });
+      }
+    });
+    
+    this.app.post('/api/machine-alerts/:machineId', this.auth.requireAuth.bind(this.auth), async (req, res) => {
+      try {
+        const { machineId } = req.params;
+        const alertConfig = req.body;
+        await this.db.setMachineAlerts(machineId, alertConfig);
+        res.json({ success: true });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+    
     // Bulk operations
     this.app.post('/api/groups/:groupId/command', this.auth.requireAuth.bind(this.auth), async (req, res) => {
       try {

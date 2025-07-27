@@ -111,6 +111,22 @@ class Database {
         }
       });
       
+      // Machine alert configurations
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS machine_alerts (
+          machine_id TEXT PRIMARY KEY,
+          enabled INTEGER DEFAULT 0,
+          cpu_threshold INTEGER DEFAULT 90,
+          memory_threshold INTEGER DEFAULT 90,
+          disk_threshold INTEGER DEFAULT 90,
+          offline_alert INTEGER DEFAULT 1,
+          online_alert INTEGER DEFAULT 0,
+          created_at INTEGER DEFAULT (strftime('%s', 'now')),
+          updated_at INTEGER DEFAULT (strftime('%s', 'now')),
+          FOREIGN KEY (machine_id) REFERENCES machines (id) ON DELETE CASCADE
+        )
+      `);
+      
       // Clean up old metrics (keep only 7 days)
       this.db.run(`DELETE FROM metrics WHERE timestamp < ?`, [Date.now() - (7 * 24 * 60 * 60 * 1000)]);
       this.db.run(`DELETE FROM alerts WHERE timestamp < ?`, [Date.now() - (7 * 24 * 60 * 60 * 1000)]);
@@ -365,6 +381,52 @@ class Database {
     );
     stmt.run(Date.now(), machineId, configKey);
     stmt.finalize();
+  }
+  
+  // Machine Alerts
+  getMachineAlerts(machineId) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        'SELECT * FROM machine_alerts WHERE machine_id = ?',
+        [machineId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row ? {
+            enabled: Boolean(row.enabled),
+            cpuThreshold: row.cpu_threshold,
+            memoryThreshold: row.memory_threshold,
+            diskThreshold: row.disk_threshold,
+            offlineAlert: Boolean(row.offline_alert),
+            onlineAlert: Boolean(row.online_alert)
+          } : null);
+        }
+      );
+    });
+  }
+  
+  setMachineAlerts(machineId, config) {
+    return new Promise((resolve, reject) => {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO machine_alerts 
+        (machine_id, enabled, cpu_threshold, memory_threshold, disk_threshold, offline_alert, online_alert, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        machineId,
+        config.enabled ? 1 : 0,
+        config.cpuThreshold,
+        config.memoryThreshold,
+        config.diskThreshold,
+        config.offlineAlert ? 1 : 0,
+        config.onlineAlert ? 1 : 0,
+        Date.now(),
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+      stmt.finalize();
+    });
   }
 }
 
