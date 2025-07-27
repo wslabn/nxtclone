@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 30
+!define VERSIONBUILD 31
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -113,8 +113,14 @@ Section "install"
     # Wait for service deletion to complete
     Sleep 2000
     
-    # Create scheduled task to run at startup as current user
-    ExecWait 'schtasks /create /tn "${APPNAME}" /tr "$INSTDIR\syswatch-agent-windows.exe $ServerUrl" /sc onstart /rl highest /f' $0
+    # Create VBS wrapper to run agent hidden
+    FileOpen $5 "$INSTDIR\start-agent.vbs" w
+    FileWrite $5 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
+    FileWrite $5 'WshShell.Run """$INSTDIR\syswatch-agent-windows.exe"" $ServerUrl", 0, False$\r$\n'
+    FileClose $5
+    
+    # Create scheduled task to run VBS wrapper
+    ExecWait 'schtasks /create /tn "${APPNAME}" /tr "wscript.exe $INSTDIR\start-agent.vbs" /sc onstart /rl highest /f' $0
     
     # Check if service creation failed
     ${If} $0 != 0
@@ -163,7 +169,7 @@ Section "uninstall"
     Delete "$INSTDIR\syswatch-agent-windows.exe"
     Delete "$INSTDIR\syswatch-tray.exe"
     Delete "$INSTDIR\tray_config.json"
-
+    Delete "$INSTDIR\start-agent.vbs"
     Delete "$INSTDIR\uninstall.exe"
     Delete "$DESKTOP\SysWatch Tray.lnk"
     RMDir "$INSTDIR"
