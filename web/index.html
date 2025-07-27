@@ -680,18 +680,29 @@
             // Load current alert settings
             try {
                 const response = await fetch(`/api/machine-alerts/${machineId}`);
-                const alerts = await response.json();
-                
-                document.getElementById('alertsEnabled').checked = alerts.enabled || false;
-                document.getElementById('cpuThreshold').value = alerts.cpuThreshold || 90;
-                document.getElementById('memoryThreshold').value = alerts.memoryThreshold || 90;
-                document.getElementById('diskThreshold').value = alerts.diskThreshold || 90;
-                document.getElementById('offlineAlert').checked = alerts.offlineAlert !== false;
-                document.getElementById('onlineAlert').checked = alerts.onlineAlert || false;
+                if (response.ok) {
+                    const alerts = await response.json();
+                    
+                    document.getElementById('alertsEnabled').checked = alerts.enabled || false;
+                    document.getElementById('cpuThreshold').value = alerts.cpuThreshold || 90;
+                    document.getElementById('memoryThreshold').value = alerts.memoryThreshold || 90;
+                    document.getElementById('diskThreshold').value = alerts.diskThreshold || 90;
+                    document.getElementById('offlineAlert').checked = alerts.offlineAlert !== false;
+                    document.getElementById('onlineAlert').checked = alerts.onlineAlert || false;
+                } else {
+                    // Default values if no settings exist
+                    document.getElementById('alertsEnabled').checked = false;
+                    document.getElementById('cpuThreshold').value = 90;
+                    document.getElementById('memoryThreshold').value = 90;
+                    document.getElementById('diskThreshold').value = 90;
+                    document.getElementById('offlineAlert').checked = true;
+                    document.getElementById('onlineAlert').checked = false;
+                }
                 
                 toggleAlertsConfig();
             } catch (error) {
-                // Default values if no settings exist
+                console.error('Error loading alerts:', error);
+                // Default values if error
                 document.getElementById('alertsEnabled').checked = false;
                 document.getElementById('cpuThreshold').value = 90;
                 document.getElementById('memoryThreshold').value = 90;
