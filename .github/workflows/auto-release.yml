@@ -75,7 +75,7 @@ jobs:
         python build-linux.py
         mkdir -p ../releases
         cp dist/syswatch-agent ../releases/syswatch-agent-linux
-        cp install-linux.sh ../releases/
+        # install-linux.sh removed - use syswatch-agent-installer-linux instead
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
