@@ -116,16 +116,24 @@ class AgentUpdater:
             if not sys.platform.startswith('win'):
                 os.chmod(current_exe + ".new", 0o755)
             
-            # Replace current executable
+            # Replace current executable using batch script for Windows
             if sys.platform.startswith('win'):
-                # Windows: rename current, move new
-                os.rename(current_exe, current_exe + ".old")
-                os.rename(current_exe + ".new", current_exe)
+                # Create batch script to replace file after exit
+                batch_script = current_exe + ".update.bat"
+                with open(batch_script, 'w') as f:
+                    f.write('@echo off\n')
+                    f.write('timeout /t 2 /nobreak >nul\n')
+                    f.write(f'move "{current_exe + ".new"}" "{current_exe}"\n')
+                    f.write(f'sc start "SysWatch Agent"\n')
+                    f.write(f'del "{batch_script}"\n')
+                
+                # The batch script will run after we exit
+                print("Update script created, will replace executable after exit")
                 
                 # Update tray app if it exists
                 self.update_tray_app_if_exists()
             else:
-                # Linux: direct replace
+                # Linux: direct replace (works fine on Linux)
                 os.rename(current_exe + ".new", current_exe)
                 
                 # Update control app if it exists
@@ -234,17 +242,23 @@ class AgentUpdater:
     def restart_agent(self):
         """Restart the current agent process"""
         try:
-            # Get current script path and arguments
-            script_path = sys.argv[0]
-            args = sys.argv[1:]
-            
-            # Start new process directly (skip service restart for both platforms)
             if sys.platform.startswith('win'):
-                subprocess.Popen([script_path] + args, creationflags=subprocess.CREATE_NO_WINDOW)
+                # Check if update batch script exists
+                script_path = sys.argv[0] + ".update.bat"
+                if os.path.exists(script_path):
+                    # Stop service and run update script
+                    subprocess.run(['sc', 'stop', 'SysWatch Agent'], check=False, capture_output=True)
+                    subprocess.Popen([script_path], shell=True)
+                    print("Running update script and exiting")
+                else:
+                    # Normal service restart
+                    subprocess.run(['sc', 'stop', 'SysWatch Agent'], check=False, capture_output=True)
+                    subprocess.run(['sc', 'start', 'SysWatch Agent'], check=False, capture_output=True)
+                    print("Service restart initiated")
             else:
-                subprocess.Popen([script_path] + args)
-            
-            print("Process restart initiated")
+                # Linux: Use systemd service restart
+                subprocess.run(['sudo', 'systemctl', 'restart', 'syswatch-agent'], check=False, capture_output=True)
+                print("Service restart initiated")
             
             # Exit current process
             sys.exit(0)
