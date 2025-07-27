@@ -46,7 +46,7 @@ class SysWatchTray:
             pystray.MenuItem("SysWatch Agent", self.show_about, default=True),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Change Server", self.change_server),
-            pystray.MenuItem("Restart Agent", self.restart_service),
+            pystray.MenuItem("Restart Service", self.restart_service),
             pystray.MenuItem("View Logs", self.view_logs),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("About", self.show_about),
@@ -82,26 +82,25 @@ class SysWatchTray:
     def restart_service(self, icon, item):
         def restart():
             try:
-                # Kill existing agent processes
-                subprocess.run(['taskkill', '/f', '/im', 'syswatch-agent-windows.exe'], 
+                # Stop service
+                subprocess.run(['sc', 'stop', 'SysWatch Agent'], 
                              capture_output=True, check=False)
                 
                 # Wait a moment
                 import time
-                time.sleep(1)
+                time.sleep(2)
                 
-                # Start new agent process
-                agent_path = Path(__file__).parent / 'syswatch-agent-windows.exe'
+                # Start service
+                result = subprocess.run(['sc', 'start', 'SysWatch Agent'], 
+                                      capture_output=True, text=True)
                 
-                if agent_path.exists():
-                    subprocess.Popen([str(agent_path), self.server_url], 
-                                   creationflags=subprocess.CREATE_NO_WINDOW)
-                    self.show_notification("Agent restarted successfully")
+                if result.returncode == 0:
+                    self.show_notification("Service restarted successfully")
                 else:
-                    self.show_notification("Could not find agent executable")
+                    self.show_notification(f"Failed to restart service: {result.stderr}")
                     
             except Exception as e:
-                self.show_notification(f"Error restarting agent: {str(e)}")
+                self.show_notification(f"Error restarting service: {str(e)}")
         
         threading.Thread(target=restart, daemon=True).start()
     

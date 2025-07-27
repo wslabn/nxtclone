@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 31
+!define VERSIONBUILD 32
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -113,14 +113,15 @@ Section "install"
     # Wait for service deletion to complete
     Sleep 2000
     
-    # Create VBS wrapper to run agent hidden
-    FileOpen $5 "$INSTDIR\start-agent.vbs" w
-    FileWrite $5 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-    FileWrite $5 'WshShell.Run """$INSTDIR\syswatch-agent-windows.exe"" $ServerUrl", 0, False$\r$\n'
-    FileClose $5
+    # Download NSSM
+    NSISdl::download "https://nssm.cc/release/nssm-2.24.zip" "$TEMP\nssm.zip"
+    nsisunz::UnzipToLog "$TEMP\nssm.zip" "$TEMP"
+    CopyFiles "$TEMP\nssm-2.24\win64\nssm.exe" "$INSTDIR\nssm.exe"
     
-    # Create scheduled task to run VBS wrapper
-    ExecWait 'schtasks /create /tn "${APPNAME}" /tr "wscript.exe $INSTDIR\start-agent.vbs" /sc onstart /rl highest /f' $0
+    # Install service using NSSM
+    ExecWait '"$INSTDIR\nssm.exe" install "${APPNAME}" "$INSTDIR\syswatch-agent-windows.exe" $ServerUrl' $0
+    ExecWait '"$INSTDIR\nssm.exe" set "${APPNAME}" Start SERVICE_AUTO_START' $1
+    ExecWait '"$INSTDIR\nssm.exe" start "${APPNAME}"' $2
     
     # Check if service creation failed
     ${If} $0 != 0
@@ -149,9 +150,13 @@ Section "install"
     
     # Show final message
     ${If} $0 == 0
-        StrCpy $2 "Task scheduled successfully. Agent will start on next boot."
+        ${If} $2 == 0
+            StrCpy $2 "Service installed and started successfully."
+        ${Else}
+            StrCpy $2 "Service installed but failed to start - check Event Viewer."
+        ${EndIf}
     ${Else}
-        StrCpy $2 "Task scheduling failed - agent may not start automatically."
+        StrCpy $2 "Service installation failed."
     ${EndIf}
     
     ${If} $InstallTray == ${BST_CHECKED}
@@ -162,14 +167,15 @@ Section "install"
 SectionEnd
 
 Section "uninstall"
-    # Remove scheduled task
-    ExecWait 'schtasks /delete /tn "${APPNAME}" /f'
+    # Stop and remove NSSM service
+    ExecWait '"$INSTDIR\nssm.exe" stop "${APPNAME}"'
+    ExecWait '"$INSTDIR\nssm.exe" remove "${APPNAME}" confirm'
     
     # Remove files
     Delete "$INSTDIR\syswatch-agent-windows.exe"
     Delete "$INSTDIR\syswatch-tray.exe"
     Delete "$INSTDIR\tray_config.json"
-    Delete "$INSTDIR\start-agent.vbs"
+    Delete "$INSTDIR\nssm.exe"
     Delete "$INSTDIR\uninstall.exe"
     Delete "$DESKTOP\SysWatch Tray.lnk"
     RMDir "$INSTDIR"
