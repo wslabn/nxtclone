@@ -340,6 +340,15 @@ def main():
     logging.info(f"Connecting to: {server_url}")
     logging.info("Auto-update enabled - agent will update automatically")
     
+    # Handle Windows service signals
+    import signal
+    def signal_handler(signum, frame):
+        logging.info(f"Received signal {signum}, shutting down...")
+        sys.exit(0)
+    
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    
     try:
         asyncio.run(agent.connect())
     except KeyboardInterrupt:

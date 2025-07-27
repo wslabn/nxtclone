@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 26
+!define VERSIONBUILD 27
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -113,9 +113,10 @@ Section "install"
     # Wait for service deletion to complete
     Sleep 2000
     
-    # Create service wrapper batch file
+    # Create service wrapper batch file with delay
     FileOpen $5 "$INSTDIR\service-wrapper.bat" w
     FileWrite $5 '@echo off$\r$\n'
+    FileWrite $5 'timeout /t 3 /nobreak >nul$\r$\n'
     FileWrite $5 'cd /d "$INSTDIR"$\r$\n'
     FileWrite $5 '"$INSTDIR\syswatch-agent-windows.exe" $ServerUrl$\r$\n'
     FileClose $5
