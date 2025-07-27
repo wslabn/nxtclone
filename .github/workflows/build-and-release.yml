@@ -6,7 +6,55 @@ on:
       - 'v*'
 
 jobs:
-  build-and-release:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Build Windows executables
+      run: |
+        cd build
+        python build-windows.py
+    
+    - name: Upload Windows artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-executables
+        path: build/dist/*.exe
+  
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Build Linux executables
+      run: |
+        cd build
+        python build-linux.py
+        chmod +x create-linux-installer.sh
+        ./create-linux-installer.sh
+    
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: linux-executables
+        path: |
+          build/dist/syswatch-agent
+          build/dist/syswatch-control
+          build/dist/syswatch-agent-installer-linux
+  
+  create-release:
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,7 +70,19 @@ jobs:
     - name: Install dependencies
       run: npm install
     
-    - name: Create distribution package
+    - name: Download Windows artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: windows-executables
+        path: ./windows-build/
+    
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: linux-executables
+        path: ./linux-build/
+    
+    - name: Create source package
       run: |
         mkdir -p dist
         cp -r server dist/
@@ -30,33 +90,37 @@ jobs:
         cp -r web dist/
         cp package.json dist/
         cp README.md dist/
-        cp DEPLOYMENT.md dist/
-        cd dist && zip -r ../nxtclone-${{ github.ref_name }}.zip .
+        cp TROUBLESHOOTING.md dist/
+        cd dist && zip -r ../syswatch-source-${{ github.ref_name }}.zip .
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        name: NxtClone ${{ github.ref_name }}
+        name: SysWatch ${{ github.ref_name }}
         body: |
-          ## NxtClone Release ${{ github.ref_name }}
+          ## SysWatch Release ${{ github.ref_name }}
           
           ### Features
           - Remote monitoring and management
           - Cross-platform agents (Windows, Linux)
-          - Real-time system metrics
+          - Real-time system metrics with scalable table view
           - Auto-update functionality
           - Web-based dashboard
+          - System tray control applications
           
-          ### Installation
-          1. Download and extract the source code
-          2. Run `npm install` in the root directory
-          3. Start server with `npm start`
-          4. Install agent dependencies: `pip install -r agents/requirements.txt`
-          5. Run agents on target machines
+          ### Quick Installation
+          **Windows:** Download and run `syswatch-agent-installer.exe` as administrator
+          **Linux:** Download and run `sudo ./syswatch-agent-installer-linux ws://your-server:3000`
+          
+          ### Optional Control Apps
+          **Windows:** Run `syswatch-tray.exe` for system tray control
+          **Linux:** Run `./syswatch-control` for GUI/CLI management
           
           ### Auto-Update
-          Agents will automatically check for and install updates from this release.
+          Agents automatically check for and install updates from this release.
         files: |
-          nxtclone-${{ github.ref_name }}.zip
+          windows-build/*
+          linux-build/*
+          syswatch-source-${{ github.ref_name }}.zip
         draft: false
         prerelease: false
