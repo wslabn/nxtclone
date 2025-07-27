@@ -618,17 +618,61 @@
                 });
         }
 
-        // Placeholder functions for features not yet implemented
-        function showMetricGraph(machineId, metricType, hostname) {
-            alert('Metric graphs feature coming soon');
-        }
-
+        // Groups management
         async function loadDatabaseGroups() {
-            groups = { 'Unknown': [] };
+            try {
+                const response = await fetch('/api/groups');
+                const dbGroups = await response.json();
+                
+                groups = { 'Unknown': [] };
+                for (const group of dbGroups) {
+                    const membersResponse = await fetch(`/api/groups/${group.id}/members`);
+                    const members = await membersResponse.json();
+                    groups[group.name] = members.map(m => m.hostname);
+                }
+                renderGroups();
+            } catch (error) {
+                console.error('Failed to load groups:', error);
+                groups = { 'Unknown': [] };
+            }
         }
 
         function renderGroups() {
-            // Simplified for now
+            const groupsList = document.getElementById('groups-list');
+            groupsList.innerHTML = '';
+            
+            Object.keys(groups).forEach(groupName => {
+                if (groupName === 'Unknown') return; // Skip Unknown group
+                
+                let groupMachines = machines.filter(m => groups[groupName]?.includes(m.hostname));
+                const onlineCount = groupMachines.filter(m => m.status === 'online').length;
+                
+                const div = document.createElement('div');
+                div.className = 'cursor-pointer p-2 rounded mb-2';
+                div.style.border = '1px solid var(--border)';
+                div.onclick = () => selectGroup(groupName);
+                
+                if (selectedGroup === groupName) {
+                    div.style.background = 'var(--primary)';
+                    div.style.color = 'white';
+                }
+                
+                div.innerHTML = `
+                    <div>${groupName}</div>
+                    <div class="text-muted" style="font-size: 0.875rem; ${selectedGroup === groupName ? 'color: rgba(255,255,255,0.8);' : ''}">${onlineCount}/${groupMachines.length} online</div>
+                `;
+                
+                groupsList.appendChild(div);
+            });
+            
+            // Update All Machines count
+            const allOnline = machines.filter(m => m.status === 'online').length;
+            document.getElementById('all-count').textContent = `${allOnline}/${machines.length} machines`;
+        }
+        
+        // Placeholder function for metric graphs
+        function showMetricGraph(machineId, metricType, hostname) {
+            alert('Metric graphs feature coming soon');
         }
 
         // Initialize
@@ -637,7 +681,10 @@
             loadDatabaseGroups();
             
             // Auto-refresh every 10 seconds
-            setInterval(loadMachines, 10000);
+            setInterval(() => {
+                loadMachines();
+                renderGroups();
+            }, 10000);
             
             // Close modal on outside click
             window.onclick = function(event) {
