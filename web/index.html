@@ -177,14 +177,9 @@
 
     <script>
         let machines = [];
-        let groups = JSON.parse(localStorage.getItem('machineGroups') || '{"Unknown": []}');
+        let groups = {};
         let selectedGroup = 'all';
         let viewMode = 'cards'; // 'cards' or 'table'
-        
-        // Ensure Unknown group exists
-        if (!groups['Unknown']) {
-            groups['Unknown'] = [];
-        }
 
         async function uninstallAgent(machineId) {
             const machine = machines.find(m => m.id === machineId);
@@ -997,25 +992,43 @@
             renderMachines();
         }
         
-        function addGroup() {
+        async function addGroup() {
             const name = prompt('Enter group name:');
-            if (name && !groups[name]) {
-                groups[name] = [];
-                localStorage.setItem('machineGroups', JSON.stringify(groups));
-                syncGroupsToServer();
-                renderGroups();
+            if (name) {
+                try {
+                    const response = await fetch('/api/groups', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, description: '', color: '#007bff' })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        await loadDatabaseGroups();
+                        renderGroups();
+                    } else {
+                        alert('Error creating group: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error creating group: ' + error.message);
+                }
             }
         }
         
-        async function syncGroupsToServer() {
+        async function loadDatabaseGroups() {
             try {
-                await fetch('/api/sync-groups', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ groups })
-                });
+                const response = await fetch('/api/groups');
+                const dbGroups = await response.json();
+                
+                // Convert database groups to sidebar format
+                groups = { 'Unknown': [] };
+                for (const group of dbGroups) {
+                    const membersResponse = await fetch(`/api/groups/${group.id}/members`);
+                    const members = await membersResponse.json();
+                    groups[group.name] = members.map(m => m.hostname);
+                }
             } catch (error) {
-                console.error('Failed to sync groups to server:', error);
+                console.error('Failed to load database groups:', error);
+                groups = { 'Unknown': [] };
             }
         }
         
@@ -1129,8 +1142,34 @@
                 groups[newGroup].push(hostname);
             }
             
-            localStorage.setItem('machineGroups', JSON.stringify(groups));
-            syncGroupsToServer();
+            // Find group ID and update database
+            try {
+                const groupsResponse = await fetch('/api/groups');
+                const dbGroups = await groupsResponse.json();
+                const targetGroup = dbGroups.find(g => g.name === newGroup);
+                
+                if (targetGroup && newGroup !== 'Unknown') {
+                    await fetch(`/api/groups/${targetGroup.id}/members`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ machineId: hostname })
+                    });
+                }
+                
+                // Remove from old groups in database
+                for (const dbGroup of dbGroups) {
+                    if (dbGroup.name !== newGroup) {
+                        await fetch(`/api/groups/${dbGroup.id}/members/${hostname}`, {
+                            method: 'DELETE'
+                        });
+                    }
+                }
+                
+                await loadDatabaseGroups();
+            } catch (error) {
+                console.error('Error updating group membership:', error);
+            }
+            
             closeAssignModal();
             renderGroups();
             renderMachines();
@@ -1500,8 +1539,9 @@
                 }
                 // Initial load
                 loadMachines();
-                renderGroups();
-                syncGroupsToServer();
+                loadDatabaseGroups().then(() => {
+                    renderGroups();
+                });
             })
             .catch(() => {
                 window.location.href = '/login';
