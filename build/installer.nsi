@@ -86,7 +86,9 @@ Section "install"
         
         # Create tray config file with server URL
         FileOpen $4 "$INSTDIR\tray_config.json" w
-        FileWrite $4 '{"server_url": "$ServerUrl"}'
+        FileWrite $4 '{"server_url": "'
+        FileWrite $4 $ServerUrl
+        FileWrite $4 '"}'
         FileClose $4
         
         # Add to Windows startup (auto-start on boot)
@@ -110,10 +112,6 @@ Section "install"
     
     # Wait for service deletion to complete
     Sleep 2000
-    
-    # Store server URL in registry for persistence
-    StrCpy $3 $ServerUrl
-    WriteRegStr HKLM "SOFTWARE\SysWatch" "ServerURL" $3
     
     # Create the service with the provided server URL
     ExecWait 'sc create "${APPNAME}" binPath= "\"$INSTDIR\syswatch-agent-windows.exe\" $ServerUrl" start= auto DisplayName= "${APPNAME}"' $0
@@ -175,6 +173,5 @@ Section "uninstall"
     
     # Remove registry entries
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}"
-    DeleteRegKey HKLM "SOFTWARE\SysWatch"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SysWatch Tray"
 SectionEnd
