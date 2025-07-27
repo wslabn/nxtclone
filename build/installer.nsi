@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 35
+!define VERSIONBUILD 36
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -116,6 +116,10 @@ Section "install"
     # Copy NSSM (include nssm.exe in build/dist/)
     File /nonfatal "dist\nssm.exe"
     
+    # Install PSWindowsUpdate module for Windows Updates feature
+    DetailPrint "Installing PSWindowsUpdate module..."
+    ExecWait 'powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force; Install-Module PSWindowsUpdate -Force -Scope AllUsers"' $3
+    
     # Install service using NSSM
     ExecWait '"$INSTDIR\nssm.exe" install "${APPNAME}" "$INSTDIR\syswatch-agent-windows.exe" $ServerUrl' $0
     ExecWait '"$INSTDIR\nssm.exe" set "${APPNAME}" Start SERVICE_AUTO_START' $1
@@ -147,6 +151,12 @@ Section "install"
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "EstimatedSize" ${INSTALLSIZE}
     
     # Show final message
+    ${If} $3 == 0
+        StrCpy $4 "PSWindowsUpdate module installed successfully."
+    ${Else}
+        StrCpy $4 "PSWindowsUpdate module installation failed - Windows Updates feature may not work."
+    ${EndIf}
+    
     ${If} $0 == 0
         ${If} $2 == 0
             StrCpy $2 "Service installed and started successfully."
@@ -158,9 +168,9 @@ Section "install"
     ${EndIf}
     
     ${If} $InstallTray == ${BST_CHECKED}
-        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent: $2$\nTray app: Desktop shortcut created$\nServer: $ServerUrl"
+        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent: $2$\nPSWindowsUpdate: $4$\nTray app: Desktop shortcut created$\nServer: $ServerUrl"
     ${Else}
-        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent: $2$\nServer: $ServerUrl"
+        MessageBox MB_OK "Installation complete!$\n$\nSysWatch Agent: $2$\nPSWindowsUpdate: $4$\nServer: $ServerUrl"
     ${EndIf}
 SectionEnd
 

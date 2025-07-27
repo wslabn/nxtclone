@@ -732,7 +732,7 @@
                     'Linux': 'dpkg -l | head -20'
                 },
                 'winupdates': {
-                    'Windows': 'powershell "Get-WUList | Select-Object Title, Size, Description | Format-Table -AutoSize"',
+                    'Windows': 'powershell -Command "Get-WUList | Select-Object Title, Size, Description | Format-Table -AutoSize"',
                     'Linux': 'echo "Windows Updates not available on Linux"'
                 },
 
