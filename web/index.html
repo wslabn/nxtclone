@@ -30,8 +30,9 @@
             }
         }
         
-        body { font-family: Arial, sans-serif; margin: 0; background: var(--bg-color); color: var(--text-color); display: flex; }
-        .sidebar { width: 250px; background: var(--card-bg); height: 100vh; box-shadow: var(--shadow); padding: 20px; overflow-y: auto; }
+        body { font-family: Arial, sans-serif; margin: 0; background: var(--bg-color); color: var(--text-color); }
+        .content-wrapper { display: flex; }
+        .sidebar { width: 250px; background: var(--card-bg); height: calc(100vh - 70px); box-shadow: var(--shadow); padding: 20px; overflow-y: auto; }
         .main-content { flex: 1; padding: 20px; }
         .header { background: var(--card-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: var(--shadow); }
         .group { margin: 10px 0; padding: 10px; background: var(--info-card-bg); border-radius: 4px; cursor: pointer; }
@@ -119,40 +120,48 @@
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <h3>Machine Groups</h3>
-        <div class="group active" onclick="selectGroup('all')">
-            <div>All Machines</div>
-            <div class="group-machines" id="all-count">0 machines</div>
-        </div>
-        <div id="groups-list"></div>
-        <button class="add-group" onclick="addGroup()">+ Add Group</button>
-    </div>
+
     
-    <div class="main-content">
-        <div class="header">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h1>🖥️ SysWatch Dashboard</h1>
-            <div>
-                <button onclick="window.location.href='/groups.html'" style="background: #4caf50; margin-right: 10px;">Groups</button>
-                <button onclick="window.location.href='/admin'" style="background: #9c27b0; margin-right: 10px;">Admin</button>
-                <button onclick="logout()" style="background: #f44336;">Logout</button>
+    <nav class="navbar navbar-expand-lg" style="background: var(--card-bg); padding: 15px 0; box-shadow: var(--shadow); margin-bottom: 20px;">
+        <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between;">
+            <a class="navbar-brand" href="/" style="font-size: 20px; font-weight: bold; color: var(--text-color); text-decoration: none;">🖥️ SysWatch Dashboard</a>
+            <div class="navbar-nav" style="display: flex; list-style: none; margin: 0; padding: 0;">
+                <a class="nav-link active" href="/" style="color: white; background: #007bff; text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Dashboard</a>
+                <a class="nav-link" href="/groups.html" style="color: var(--text-color); text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Groups</a>
+                <a class="nav-link" href="/admin" style="color: var(--text-color); text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Admin</a>
+                <button onclick="logout()" style="background: #f44336; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Logout</button>
             </div>
         </div>
-        <div class="update-controls" style="margin: 10px 0; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <button onclick="checkForUpdates()">Check for Updates</button>
-                <button onclick="updateAllAgents()">Update All Agents</button>
-                <button onclick="cleanupOfflineMachines()" style="background: #f44336;">Cleanup Offline</button>
-                <span id="update-status"></span>
+    </nav>
+    
+    <div class="content-wrapper">
+        <div class="sidebar">
+            <h3>Machine Groups</h3>
+            <div class="group active" onclick="selectGroup('all')">
+                <div>All Machines</div>
+                <div class="group-machines" id="all-count">0 machines</div>
             </div>
-            <div>
-                <button onclick="toggleView()" id="viewToggle" style="background: #9c27b0;">Table View</button>
-            </div>
+            <div id="groups-list"></div>
+            <button class="add-group" onclick="addGroup()">+ Add Group</button>
         </div>
-        <div class="summary" id="summary"></div>
-    </div>
-        <div id="machines"></div>
+        
+        <div class="main-content">
+            <div class="header">
+                <div class="update-controls" style="margin: 10px 0; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <button onclick="checkForUpdates()">Check for Updates</button>
+                        <button onclick="updateAllAgents()">Update All Agents</button>
+                        <button onclick="cleanupOfflineMachines()" style="background: #f44336;">Cleanup Offline</button>
+                        <span id="update-status"></span>
+                    </div>
+                    <div>
+                        <button onclick="toggleView()" id="viewToggle" style="background: #9c27b0;">Table View</button>
+                    </div>
+                </div>
+                <div class="summary" id="summary"></div>
+            </div>
+            <div id="machines"></div>
+        </div>
     </div>
     
     <!-- Modal for command output -->

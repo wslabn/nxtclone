@@ -41,9 +41,19 @@
     </style>
 </head>
 <body>
+    <nav class="navbar navbar-expand-lg" style="background: var(--card-bg); padding: 15px 0; box-shadow: var(--shadow); margin-bottom: 20px;">
+        <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between;">
+            <a class="navbar-brand" href="/" style="font-size: 20px; font-weight: bold; color: var(--text-color); text-decoration: none;">🔐 SysWatch Admin</a>
+            <div class="navbar-nav" style="display: flex; list-style: none; margin: 0; padding: 0;">
+                <a class="nav-link" href="/" style="color: var(--text-color); text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Dashboard</a>
+                <a class="nav-link" href="/groups.html" style="color: var(--text-color); text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Groups</a>
+                <a class="nav-link active" href="/admin" style="color: white; background: #007bff; text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Admin</a>
+                <button onclick="logout()" style="background: #f44336; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Logout</button>
+            </div>
+        </div>
+    </nav>
+    
     <div class="container">
-        <h1>SysWatch Admin Panel</h1>
-        <button onclick="window.location.href='/'" style="margin-bottom: 20px;">Back to Dashboard</button>
         
         <div class="card">
             <h2>Change Password</h2>
@@ -264,6 +274,14 @@
                 logsList.innerHTML = `<div style="color: #f44336;">Failed to load logs: ${error.message}</div>`;
                 container.style.display = 'block';
             }
+        }
+        
+        function logout() {
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => {
+                    document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                    window.location.href = '/login';
+                });
         }
         
         loadUsers();

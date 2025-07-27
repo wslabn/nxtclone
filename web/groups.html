@@ -23,7 +23,13 @@
             }
         }
         body { font-family: Arial, sans-serif; margin: 0; background: var(--bg-color); color: var(--text-color); }
-        .navbar { background: var(--card-bg); padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px; }
+        .navbar { background: var(--card-bg); padding: 15px 0; box-shadow: var(--shadow); margin-bottom: 20px; }
+        .navbar-brand { font-size: 20px; font-weight: bold; color: var(--text-color); text-decoration: none; }
+        .navbar-nav { display: flex; list-style: none; margin: 0; padding: 0; margin-left: auto; }
+        .nav-link { color: var(--text-color); text-decoration: none; padding: 8px 15px; border-radius: 4px; }
+        .nav-link:hover { background: var(--bg-color); }
+        .nav-link.active { background: #007bff; color: white; }
+        .navbar-expand-lg { display: flex; align-items: center; justify-content: space-between; }
         .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
         .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: var(--shadow); margin-bottom: 20px; }
         .card-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; }
@@ -63,15 +69,14 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-desktop me-2"></i>SysWatch
-            </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/">Dashboard</a>
-                <a class="nav-link active" href="/groups.html">Groups</a>
-                <a class="nav-link" href="/admin">Admin</a>
+    <nav class="navbar navbar-expand-lg" style="background: var(--card-bg); padding: 15px 0; box-shadow: var(--shadow); margin-bottom: 20px;">
+        <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between;">
+            <a class="navbar-brand" href="/" style="font-size: 20px; font-weight: bold; color: var(--text-color); text-decoration: none;">🖥️ SysWatch Groups</a>
+            <div class="navbar-nav" style="display: flex; list-style: none; margin: 0; padding: 0;">
+                <a class="nav-link" href="/" style="color: var(--text-color); text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Dashboard</a>
+                <a class="nav-link active" href="/groups.html" style="color: white; background: #007bff; text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Groups</a>
+                <a class="nav-link" href="/admin" style="color: var(--text-color); text-decoration: none; padding: 8px 15px; border-radius: 4px; margin-right: 5px;">Admin</a>
+                <button onclick="logout()" style="background: #f44336; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Logout</button>
             </div>
         </div>
     </nav>
@@ -453,6 +458,14 @@
                     modal.style.display = 'none';
                 }
             });
+        }
+        
+        function logout() {
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => {
+                    document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                    window.location.href = '/login';
+                });
         }
         
         // Initialize
