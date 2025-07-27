@@ -3,7 +3,7 @@
 !define DESCRIPTION "Remote monitoring and management agent"
 !define VERSIONMAJOR 1
 !define VERSIONMINOR 1
-!define VERSIONBUILD 29
+!define VERSIONBUILD 30
 
 !define HELPURL "https://github.com/your-username/syswatch"
 !define UPDATEURL "https://github.com/your-username/syswatch/releases"
@@ -113,16 +113,8 @@ Section "install"
     # Wait for service deletion to complete
     Sleep 2000
     
-    # Create service wrapper batch file with delay
-    FileOpen $5 "$INSTDIR\service-wrapper.bat" w
-    FileWrite $5 '@echo off$\r$\n'
-    FileWrite $5 'timeout /t 3 /nobreak >nul$\r$\n'
-    FileWrite $5 'cd /d "$INSTDIR"$\r$\n'
-    FileWrite $5 '"$INSTDIR\syswatch-agent-windows.exe" $ServerUrl$\r$\n'
-    FileClose $5
-    
-    # Create the service using batch wrapper
-    ExecWait 'sc create "${APPNAME}" binPath= "$INSTDIR\service-wrapper.bat" start= auto DisplayName= "${APPNAME}"' $0
+    # Create scheduled task to run at startup
+    ExecWait 'schtasks /create /tn "${APPNAME}" /tr "$INSTDIR\syswatch-agent-windows.exe $ServerUrl" /sc onstart /ru SYSTEM /f' $0
     
     # Start the service
     ExecWait 'sc start "${APPNAME}"' $1
@@ -167,15 +159,14 @@ Section "install"
 SectionEnd
 
 Section "uninstall"
-    # Stop and remove service
-    ExecWait 'sc stop "${APPNAME}"'
-    ExecWait 'sc delete "${APPNAME}"'
+    # Remove scheduled task
+    ExecWait 'schtasks /delete /tn "${APPNAME}" /f'
     
     # Remove files
     Delete "$INSTDIR\syswatch-agent-windows.exe"
     Delete "$INSTDIR\syswatch-tray.exe"
     Delete "$INSTDIR\tray_config.json"
-    Delete "$INSTDIR\service-wrapper.bat"
+
     Delete "$INSTDIR\uninstall.exe"
     Delete "$DESKTOP\SysWatch Tray.lnk"
     RMDir "$INSTDIR"
