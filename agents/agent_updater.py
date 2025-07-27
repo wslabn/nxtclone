@@ -34,15 +34,36 @@ class AgentUpdater:
             release = response.json()
             latest_version = release["tag_name"].replace("v", "")
             
+            # Get platform-specific download URL
+            download_url = self.get_platform_download_url(release)
+            
             return {
                 "has_update": self.compare_versions(latest_version, self.current_version) > 0,
                 "current_version": self.current_version,
                 "latest_version": latest_version,
-                "download_url": release["zipball_url"],
+                "download_url": download_url,
                 "release_notes": release.get("body", "")
             }
         except Exception as e:
             return {"error": str(e)}
+    
+    def get_platform_download_url(self, release):
+        """Get the correct download URL for current platform"""
+        assets = release.get("assets", [])
+        
+        if sys.platform.startswith('win'):
+            # Look for Windows executable
+            for asset in assets:
+                if asset["name"] == "syswatch-agent-windows.exe":
+                    return asset["browser_download_url"]
+        else:
+            # Look for Linux executable
+            for asset in assets:
+                if asset["name"] == "syswatch-agent-linux":
+                    return asset["browser_download_url"]
+        
+        # Fallback to source code
+        return release["zipball_url"]
     
     def compare_versions(self, a, b):
         a_parts = [int(x) for x in a.split('.')]
@@ -64,24 +85,72 @@ class AgentUpdater:
         try:
             print("Downloading update...")
             
-            # Download the release
+            # Check if this is a direct executable download
+            if download_url.endswith(('.exe', '-linux')):
+                return self.download_executable_update(download_url)
+            else:
+                return self.download_source_update(download_url)
+                
+        except Exception as e:
+            print(f"Update failed: {e}")
+            return False
+    
+    def download_executable_update(self, download_url):
+        """Download and replace executable"""
+        try:
             response = requests.get(download_url, stream=True, timeout=30)
             response.raise_for_status()
             
-            # Create temp directory
+            current_exe = sys.argv[0]
+            backup_exe = current_exe + ".backup"
+            
+            # Create backup
+            shutil.copy2(current_exe, backup_exe)
+            
+            # Download new executable
+            with open(current_exe + ".new", 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            # Make executable (Linux)
+            if not sys.platform.startswith('win'):
+                os.chmod(current_exe + ".new", 0o755)
+            
+            # Replace current executable
+            if sys.platform.startswith('win'):
+                # Windows: rename current, move new
+                os.rename(current_exe, current_exe + ".old")
+                os.rename(current_exe + ".new", current_exe)
+            else:
+                # Linux: direct replace
+                os.rename(current_exe + ".new", current_exe)
+            
+            print("Executable updated successfully")
+            return True
+            
+        except Exception as e:
+            print(f"Executable update failed: {e}")
+            # Restore backup if available
+            if os.path.exists(backup_exe):
+                shutil.copy2(backup_exe, current_exe)
+            return False
+    
+    def download_source_update(self, download_url):
+        """Download and update from source (fallback)"""
+        try:
+            response = requests.get(download_url, stream=True, timeout=30)
+            response.raise_for_status()
+            
             with tempfile.TemporaryDirectory() as temp_dir:
                 zip_path = os.path.join(temp_dir, "update.zip")
                 
-                # Save zip file
                 with open(zip_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
                 
-                # Extract zip
                 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                     zip_ref.extractall(temp_dir)
                 
-                # Find the extracted folder (GitHub creates a folder with repo name)
                 extracted_folders = [d for d in os.listdir(temp_dir) if os.path.isdir(os.path.join(temp_dir, d))]
                 if not extracted_folders:
                     raise Exception("No extracted folder found")
@@ -89,7 +158,6 @@ class AgentUpdater:
                 source_dir = os.path.join(temp_dir, extracted_folders[0], "agents")
                 current_dir = Path(__file__).parent
                 
-                # Copy new agent files
                 if os.path.exists(source_dir):
                     for file in os.listdir(source_dir):
                         if file.endswith('.py') or file == 'version.txt':
@@ -98,11 +166,10 @@ class AgentUpdater:
                             shutil.copy2(src, dst)
                             print(f"Updated {file}")
                 
-                print("Update completed. Restarting agent...")
                 return True
                 
         except Exception as e:
-            print(f"Update failed: {e}")
+            print(f"Source update failed: {e}")
             return False
     
     def restart_agent(self):
