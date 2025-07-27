@@ -322,7 +322,7 @@ class WindowsAgent:
                 "cpu_percent": psutil.cpu_percent(interval=1),
                 "memory_percent": memory.percent,
                 "memory_used": memory.used,
-                "disk_percent": (disk.used / disk.total) * 100,
+                "disk_percent": disk.percent,
                 "disk_used": disk.used,
                 "process_count": len(psutil.pids()),
                 "network_io": dict(psutil.net_io_counters()._asdict()) if psutil.net_io_counters() else {},
