@@ -52,9 +52,12 @@
                         <h3 class="card-title">Machine Groups</h3>
                     </div>
                     <div class="card-body">
-                        <div class="group active cursor-pointer p-2 rounded mb-2" onclick="selectGroup('all')" style="background: var(--primary); color: white;">
-                            <div>All Machines</div>
-                            <div class="text-muted" id="all-count" style="color: rgba(255,255,255,0.8);">0 machines</div>
+                        <div class="form-group mb-3">
+                            <input type="text" id="searchInput" class="form-input" placeholder="Search machines or groups..." oninput="filterContent()">
+                        </div>
+                        <div class="group active cursor-pointer p-2 rounded mb-2" onclick="selectGroup('all', this)" id="all-group">
+                            <div id="all-title">All Machines</div>
+                            <div class="text-muted" id="all-count">0 machines</div>
                         </div>
                         <div id="groups-list"></div>
                     </div>
@@ -212,7 +215,21 @@
         function renderMachines() {
             renderSummary();
             const container = document.getElementById('machines');
-            const filteredMachines = getFilteredMachines();
+            
+            // Check if search is active
+            const searchTerm = document.getElementById('searchInput')?.value?.toLowerCase();
+            let filteredMachines;
+            
+            if (searchTerm) {
+                // Use search filtering
+                filteredMachines = machines.filter(machine => 
+                    machine.hostname.toLowerCase().includes(searchTerm) ||
+                    machine.platform.toLowerCase().includes(searchTerm)
+                );
+            } else {
+                // Use group filtering
+                filteredMachines = getFilteredMachines();
+            }
             
             if (viewMode === 'table') {
                 renderTableView(container, filteredMachines);
@@ -594,10 +611,31 @@
             return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
         }
 
-        function selectGroup(groupName) {
+        function selectGroup(groupName, element) {
             selectedGroup = groupName;
-            document.querySelectorAll('.group').forEach(g => g.classList.remove('active'));
-            event.target.closest('.group').classList.add('active');
+            
+            // Remove active styling from all groups
+            document.querySelectorAll('.group').forEach(g => {
+                g.classList.remove('active');
+                g.style.background = '';
+                g.style.color = '';
+            });
+            
+            // Add active styling to selected group
+            if (element && element.classList) {
+                element.classList.add('active');
+                element.style.background = 'var(--primary)';
+                element.style.color = 'white';
+                
+                // Special handling for All Machines group
+                if (groupName === 'all') {
+                    const title = element.querySelector('#all-title');
+                    const count = element.querySelector('#all-count');
+                    if (title) title.style.color = 'white';
+                    if (count) count.style.color = 'rgba(255,255,255,0.8)';
+                }
+            }
+            
             renderMachines();
         }
 
@@ -796,7 +834,7 @@
                 const div = document.createElement('div');
                 div.className = 'cursor-pointer p-2 rounded mb-2';
                 div.style.border = '1px solid var(--border)';
-                div.onclick = () => selectGroup(groupName);
+                div.onclick = (e) => selectGroup(groupName, div);
                 
                 if (selectedGroup === groupName) {
                     div.style.background = 'var(--primary)';
@@ -1011,10 +1049,40 @@
             });
         }
 
+        // Search functionality
+        function filterContent() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            if (!searchTerm) {
+                // Show all groups
+                document.querySelectorAll('.group').forEach(g => g.style.display = 'block');
+            } else {
+                // Filter groups
+                document.querySelectorAll('.group').forEach(group => {
+                    const groupText = group.textContent.toLowerCase();
+                    group.style.display = groupText.includes(searchTerm) ? 'block' : 'none';
+                });
+            }
+            
+            // Re-render machines with search filter
+            renderMachines();
+        }
+        
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadMachines();
             loadDatabaseGroups();
+            
+            // Set initial active state for All Machines
+            const allGroup = document.getElementById('all-group');
+            if (allGroup) {
+                allGroup.style.background = 'var(--primary)';
+                allGroup.style.color = 'white';
+                const title = allGroup.querySelector('#all-title');
+                const count = allGroup.querySelector('#all-count');
+                if (title) title.style.color = 'white';
+                if (count) count.style.color = 'rgba(255,255,255,0.8)';
+            }
             
             // Auto-refresh every 10 seconds
             setInterval(() => {
