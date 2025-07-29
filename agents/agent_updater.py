@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import zipfile
 import shutil
+import json
 from pathlib import Path
 
 class AgentUpdater:
@@ -29,7 +30,6 @@ class AgentUpdater:
             
             if package_file.exists():
                 print(f"Found package.json, reading version...")
-                import json
                 with open(package_file, 'r') as f:
                     package_data = json.load(f)
                     version = package_data.get('version', '1.0.0')

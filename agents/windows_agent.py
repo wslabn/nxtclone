@@ -128,7 +128,6 @@ class WindowsAgent:
                 package_file = os.path.join(os.path.dirname(__file__), "..", "package.json")
                 if os.path.exists(package_file):
                     with open(package_file, 'r') as f:
-                        import json
                         package_data = json.load(f)
                         version = package_data.get('version', 'Unknown')
         except Exception as e:
