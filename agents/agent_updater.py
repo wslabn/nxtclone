@@ -15,7 +15,16 @@ class AgentUpdater:
         
     def get_current_version(self):
         try:
-            # Read version from package.json
+            # First try embedded version.txt (for executables)
+            version_file = Path(__file__).parent / "version.txt"
+            print(f"Looking for embedded version.txt at: {version_file}")
+            
+            if version_file.exists():
+                version = version_file.read_text().strip()
+                print(f"Read version from embedded file: {version}")
+                return version
+            
+            # Fallback: try package.json (for source installs)
             package_file = Path(__file__).parent / ".." / "package.json"
             print(f"Looking for package.json at: {package_file}")
             
@@ -27,27 +36,9 @@ class AgentUpdater:
                     version = package_data.get('version', '1.0.0')
                     print(f"Read version from package.json: {version}")
                     return version
-            else:
-                print(f"package.json not found at {package_file}")
-                # Fallback: try to find package.json in different locations
-                possible_paths = [
-                    Path(__file__).parent.parent / "package.json",
-                    Path("package.json"),
-                    Path("../package.json")
-                ]
-                
-                for path in possible_paths:
-                    print(f"Trying fallback path: {path}")
-                    if path.exists():
-                        import json
-                        with open(path, 'r') as f:
-                            package_data = json.load(f)
-                            version = package_data.get('version', '1.0.0')
-                            print(f"Found version at {path}: {version}")
-                            return version
-                
-                print("No package.json found in any location")
-                return "1.0.0"
+            
+            print("No version file found")
+            return "1.0.0"
         except Exception as e:
             print(f"Error reading version: {e}")
             return "1.0.0"

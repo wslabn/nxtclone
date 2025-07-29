@@ -25,14 +25,37 @@ class SysWatchLinuxTray:
     
     def load_config(self):
         try:
-            if self.config_file.exists():
-                with open(self.config_file, 'r') as f:
-                    config = json.load(f)
-                    self.server_url = config.get('server_url', 'ws://localhost:3000')
-            else:
-                self.server_url = 'ws://localhost:3000'
+            # First try to get server URL from running agent process
+            self.server_url = self.get_agent_server_url()
+            
+            # Fallback to config file
+            if not self.server_url or self.server_url == 'ws://localhost:3000':
+                if self.config_file.exists():
+                    with open(self.config_file, 'r') as f:
+                        config = json.load(f)
+                        self.server_url = config.get('server_url', 'ws://localhost:3000')
+                else:
+                    self.server_url = 'ws://localhost:3000'
         except:
             self.server_url = 'ws://localhost:3000'
+    
+    def get_agent_server_url(self):
+        """Get server URL from running agent process"""
+        try:
+            import subprocess
+            # Get command line of running agent process
+            result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+            
+            for line in result.stdout.split('\n'):
+                if 'syswatch-agent-linux' in line and 'ws://' in line:
+                    # Extract URL from command line
+                    parts = line.split()
+                    for part in parts:
+                        if part.startswith('ws://'):
+                            return part
+            return None
+        except:
+            return None
     
     def save_config(self):
         try:
