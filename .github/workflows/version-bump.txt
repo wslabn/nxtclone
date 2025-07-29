@@ -1,0 +1,2 @@
+This workflow has been disabled and replaced by auto-release.yml
+Original content moved to version-bump.yml.disabled
