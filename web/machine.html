@@ -39,8 +39,9 @@
                             </div>
                         </div>
                     </div>
-                    <div>
-                        <!-- Quick actions moved to command terminal -->
+                    <div style="text-align: right;">
+                        <div id="systemScore" style="font-size: 2rem; font-weight: bold; color: var(--text-muted);">-</div>
+                        <div class="text-muted" style="font-size: 0.875rem;">System Score</div>
                     </div>
                 </div>
             </div>
@@ -280,6 +281,47 @@
             }
         }
 
+        // System Scoring (0-10 scale based on metrics)
+        function calculateSystemScore(machine) {
+            if (!machine.metrics || machine.status === 'offline') return 0.0;
+            
+            const metrics = machine.metrics;
+            let score = 10.0;
+            
+            // CPU Usage (higher usage = lower score)
+            if (metrics.cpu_percent > 90) score -= 3.0;
+            else if (metrics.cpu_percent > 75) score -= 2.0;
+            else if (metrics.cpu_percent > 50) score -= 1.0;
+            else if (metrics.cpu_percent < 10) score -= 0.5; // Too low might indicate issues
+            
+            // Memory Usage (higher usage = lower score)
+            if (metrics.memory_percent > 95) score -= 3.0;
+            else if (metrics.memory_percent > 85) score -= 2.0;
+            else if (metrics.memory_percent > 70) score -= 1.0;
+            
+            // Disk Usage (higher usage = lower score)
+            if (metrics.disk_percent > 95) score -= 2.5;
+            else if (metrics.disk_percent > 85) score -= 1.5;
+            else if (metrics.disk_percent > 75) score -= 0.5;
+            
+            // Process Count (too many processes = lower score)
+            if (metrics.process_count > 200) score -= 1.0;
+            else if (metrics.process_count > 150) score -= 0.5;
+            
+            // Ensure score stays within 0-10 range
+            score = Math.max(0, Math.min(10, score));
+            
+            // Round to 1 decimal place
+            return Math.round(score * 10) / 10;
+        }
+        
+        function getScoreColor(score) {
+            if (score >= 8.0) return 'var(--success)';
+            if (score >= 6.0) return 'var(--warning)';
+            if (score >= 4.0) return 'var(--info)';
+            return 'var(--danger)';
+        }
+
         // Render machine information
         function renderMachine() {
             if (!machine) return;
@@ -294,6 +336,12 @@
                 <span class="badge badge-${machine.status === 'online' ? 'success' : 'danger'}">${machine.status.toUpperCase()}</span>
                 <span class="text-muted">Last seen: ${lastSeen}</span>
             `;
+            
+            // Update system score
+            const score = calculateSystemScore(machine);
+            const scoreElement = document.getElementById('systemScore');
+            scoreElement.textContent = score.toFixed(1);
+            scoreElement.style.color = getScoreColor(score);
 
             // Render quick actions
             renderQuickActions();

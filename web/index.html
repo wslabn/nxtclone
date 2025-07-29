@@ -295,6 +295,10 @@
                                     <span class="text-muted">Last seen: ${lastSeen}</span>
                                 </div>
                             </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: ${getScoreColor(calculateSystemScore(machine))}">${calculateSystemScore(machine)}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">System Score</div>
+                            </div>
                         </div>
                     </div>
                     <div class="card-body">
