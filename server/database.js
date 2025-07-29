@@ -121,11 +121,19 @@ class Database {
           disk_threshold INTEGER DEFAULT 90,
           offline_alert INTEGER DEFAULT 1,
           online_alert INTEGER DEFAULT 0,
+          anomaly_alerts INTEGER DEFAULT 0,
           created_at INTEGER DEFAULT (strftime('%s', 'now')),
           updated_at INTEGER DEFAULT (strftime('%s', 'now')),
           FOREIGN KEY (machine_id) REFERENCES machines (id) ON DELETE CASCADE
         )
       `);
+      
+      // Add anomaly_alerts column if it doesn't exist (migration)
+      this.db.run(`ALTER TABLE machine_alerts ADD COLUMN anomaly_alerts INTEGER DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.error('Migration error:', err.message);
+        }
+      });
       
       // Clean up old metrics (keep only 7 days)
       this.db.run(`DELETE FROM metrics WHERE timestamp < ?`, [Date.now() - (7 * 24 * 60 * 60 * 1000)]);
@@ -397,7 +405,8 @@ class Database {
             memoryThreshold: row.memory_threshold,
             diskThreshold: row.disk_threshold,
             offlineAlert: Boolean(row.offline_alert),
-            onlineAlert: Boolean(row.online_alert)
+            onlineAlert: Boolean(row.online_alert),
+            anomalyAlerts: Boolean(row.anomaly_alerts)
           } : null);
         }
       );
@@ -408,8 +417,8 @@ class Database {
     return new Promise((resolve, reject) => {
       const stmt = this.db.prepare(`
         INSERT OR REPLACE INTO machine_alerts 
-        (machine_id, enabled, cpu_threshold, memory_threshold, disk_threshold, offline_alert, online_alert, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (machine_id, enabled, cpu_threshold, memory_threshold, disk_threshold, offline_alert, online_alert, anomaly_alerts, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       stmt.run(
         machineId,
@@ -419,6 +428,7 @@ class Database {
         config.diskThreshold,
         config.offlineAlert ? 1 : 0,
         config.onlineAlert ? 1 : 0,
+        config.anomalyAlerts ? 1 : 0,
         Date.now(),
         function(err) {
           if (err) reject(err);

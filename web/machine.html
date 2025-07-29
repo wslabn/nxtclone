@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Details - SysWatch</title>
+    <link rel="stylesheet" href="/shared.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-content">
+                <a href="/" class="navbar-brand">🖥️ SysWatch Dashboard</a>
+                <ul class="navbar-nav">
+                    <li><a href="/" class="nav-link">Dashboard</a></li>
+                    <li><a href="/groups.html" class="nav-link">Groups</a></li>
+                    <li><a href="/admin" class="nav-link">Admin</a></li>
+                    <li><button onclick="logout()" class="btn btn-danger btn-sm">Logout</button></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Machine Header -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="flex flex-between">
+                    <div class="flex" style="align-items: center; gap: 1rem;">
+                        <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+                        <div>
+                            <h2 id="machineTitle" style="margin: 0;">Loading...</h2>
+                            <div id="machineStatus" class="flex" style="align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                                <div class="status-dot status-offline"></div>
+                                <span class="badge badge-danger">OFFLINE</span>
+                                <span class="text-muted">Last seen: Unknown</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <!-- Quick actions moved to command terminal -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="grid grid-2 mb-4">
+            <!-- Live Metrics -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Live Metrics</h3>
+                </div>
+                <div class="card-body" id="liveMetrics">
+                    <p class="text-muted">No metrics available</p>
+                </div>
+            </div>
+
+            <!-- System Info -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">System Information</h3>
+                </div>
+                <div class="card-body" id="systemInfo">
+                    <p class="text-muted">System information not available</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Command Terminal -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="flex flex-between">
+                    <h3 class="card-title">Command Terminal</h3>
+                    <div id="quickActions">
+                        <!-- Quick actions will be populated here -->
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="flex mb-3">
+                    <input type="text" id="commandInput" placeholder="Enter command..." class="form-input" style="flex: 1; margin-right: 0.5rem;">
+                    <button onclick="executeCommand()" class="btn btn-primary" style="margin-right: 0.5rem;">Execute</button>
+                    <button onclick="clearTerminal()" class="btn btn-secondary">Clear</button>
+                </div>
+                <div id="commandOutput" style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius); font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; min-height: 150px;">
+                    Ready for commands...
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric Graphs -->
+        <div class="card">
+            <div class="card-header">
+                <div class="flex flex-between">
+                    <h3 class="card-title">Performance Metrics</h3>
+                    <div class="flex">
+                        <button class="btn btn-success btn-sm" onclick="refreshGraphs()">Refresh</button>
+                        <button class="btn btn-info btn-sm" id="realtimeBtn" onclick="toggleRealtime()">Real-time: OFF</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Metric Tabs -->
+                <div class="flex mb-3" style="border-bottom: 1px solid var(--border);">
+                    <button class="metric-tab active" onclick="showMetric('cpu')" id="cpu-tab">CPU Usage</button>
+                    <button class="metric-tab" onclick="showMetric('memory')" id="memory-tab">Memory Usage</button>
+                    <button class="metric-tab" onclick="showMetric('disk')" id="disk-tab">Disk Usage</button>
+                    <button class="metric-tab" onclick="showMetric('process')" id="process-tab">Processes</button>
+                </div>
+                
+                <!-- Chart Container -->
+                <div style="height: 400px;">
+                    <canvas id="metricsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts Configuration Modal -->
+    <div id="alertsModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="alertsModalTitle">Configure Alerts</h3>
+                    <button class="modal-close" onclick="closeAlertsModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="alertsForm">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="alertsEnabled" style="margin-right: 0.5rem;">
+                                Enable Alerts for this Machine
+                            </label>
+                        </div>
+                        
+                        <div id="alertsConfig" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">CPU Usage Alert (%)</label>
+                                <input type="number" id="cpuThreshold" class="form-input" min="1" max="100" value="90">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Memory Usage Alert (%)</label>
+                                <input type="number" id="memoryThreshold" class="form-input" min="1" max="100" value="90">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Disk Usage Alert (%)</label>
+                                <input type="number" id="diskThreshold" class="form-input" min="1" max="100" value="90">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" id="offlineAlert" style="margin-right: 0.5rem;">
+                                    Alert when machine goes offline
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" id="onlineAlert" style="margin-right: 0.5rem;">
+                                    Alert when machine comes back online
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" id="anomalyAlerts" style="margin-right: 0.5rem;">
+                                    Enable anomaly detection alerts (CPU/Memory spikes)
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeAlertsModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveAlerts()">Save Alerts</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .metric-tab {
+            background: none;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .metric-tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+        
+        .metric-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            min-width: 150px;
+            z-index: 1000;
+        }
+        
+        .dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 0.5rem 1rem;
+            background: none;
+            border: none;
+            text-align: left;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        
+        .dropdown-item:hover:not(:disabled) {
+            background: var(--bg-secondary);
+        }
+        
+        .dropdown-item:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+
+    <script>
+        let machineId = null;
+        let machine = null;
+        let currentMetric = 'cpu';
+        let metricsChart = null;
+        let isRealtime = false;
+        let realtimeInterval = null;
+
+        // Get machine ID from URL
+        function getMachineIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id');
+        }
+
+        // Load machine data
+        async function loadMachine() {
+            machineId = getMachineIdFromUrl();
+            if (!machineId) {
+                window.location.href = '/';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/machines');
+                const machines = await response.json();
+                machine = machines.find(m => m.id === machineId);
+                
+                if (!machine) {
+                    alert('Machine not found');
+                    window.location.href = '/';
+                    return;
+                }
+
+                renderMachine();
+                loadMetrics();
+            } catch (error) {
+                console.error('Failed to load machine:', error);
+            }
+        }
+
+        // Render machine information
+        function renderMachine() {
+            if (!machine) return;
+
+            // Update title and status
+            document.getElementById('machineTitle').textContent = `${machine.hostname} - ${machine.platform}`;
+            
+            const statusElement = document.getElementById('machineStatus');
+            const lastSeen = new Date(machine.lastSeen).toLocaleString();
+            statusElement.innerHTML = `
+                <div class="status-dot status-${machine.status}"></div>
+                <span class="badge badge-${machine.status === 'online' ? 'success' : 'danger'}">${machine.status.toUpperCase()}</span>
+                <span class="text-muted">Last seen: ${lastSeen}</span>
+            `;
+
+            // Render quick actions
+            renderQuickActions();
+            
+            // Render live metrics
+            renderLiveMetrics();
+            
+            // Render system info
+            renderSystemInfo();
+        }
+
+        function renderQuickActions() {
+            const disabled = machine.status === 'offline';
+            const isWindows = machine.platform.includes('Windows');
+            
+            document.getElementById('quickActions').innerHTML = `
+                <div class="flex">
+                    <!-- System Actions -->
+                    <div class="dropdown" style="position: relative; margin-right: 0.5rem;">
+                        <button class="btn btn-danger btn-sm dropdown-toggle" ${disabled ? 'disabled' : ''} onclick="toggleDropdown('system-dropdown')">
+                            System ▼
+                        </button>
+                        <div id="system-dropdown" class="dropdown-menu" style="display: none;">
+                            <button onclick="quickAction('shutdown'); closeDropdowns()" class="dropdown-item">Shutdown</button>
+                            <button onclick="quickAction('reboot'); closeDropdowns()" class="dropdown-item">Reboot</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Information Actions -->
+                    <div class="dropdown" style="position: relative; margin-right: 0.5rem;">
+                        <button class="btn btn-info btn-sm dropdown-toggle" ${disabled ? 'disabled' : ''} onclick="toggleDropdown('info-dropdown')">
+                            Info ▼
+                        </button>
+                        <div id="info-dropdown" class="dropdown-menu" style="display: none;">
+                            <button onclick="quickAction('processes'); closeDropdowns()" class="dropdown-item">Processes</button>
+                            <button onclick="quickAction('services'); closeDropdowns()" class="dropdown-item">Services</button>
+                            <button onclick="quickAction('software'); closeDropdowns()" class="dropdown-item">Software</button>
+                            <button onclick="quickAction('network'); closeDropdowns()" class="dropdown-item">Network</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Maintenance Actions -->
+                    <div class="dropdown" style="position: relative;">
+                        <button class="btn btn-warning btn-sm dropdown-toggle" onclick="toggleDropdown('maintenance-dropdown')">
+                            Maintenance ▼
+                        </button>
+                        <div id="maintenance-dropdown" class="dropdown-menu" style="display: none;">
+                            <button onclick="updateAgent(); closeDropdowns()" class="dropdown-item" ${disabled ? 'disabled' : ''}>Update Agent</button>
+                            ${isWindows ? `<button onclick="quickAction('winupdates'); closeDropdowns()" class="dropdown-item" ${disabled ? 'disabled' : ''}>Windows Updates</button>` : ''}
+                            <button onclick="showAlertsModal(); closeDropdowns()" class="dropdown-item">Configure Alerts</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLiveMetrics() {
+            const metrics = machine.metrics || {};
+            if (!metrics.cpu_percent) {
+                document.getElementById('liveMetrics').innerHTML = '<p class="text-muted">No metrics available</p>';
+                return;
+            }
+
+            document.getElementById('liveMetrics').innerHTML = `
+                <div class="mb-3">
+                    <div class="flex flex-between mb-1">
+                        <span>CPU Usage</span>
+                        <span style="font-weight: bold;">${metrics.cpu_percent.toFixed(1)}%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar progress-cpu" style="width: ${metrics.cpu_percent}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="flex flex-between mb-1">
+                        <span>Memory Usage</span>
+                        <span style="font-weight: bold;">${metrics.memory_percent.toFixed(1)}%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar progress-memory" style="width: ${metrics.memory_percent}%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="flex flex-between mb-1">
+                        <span>Disk Usage</span>
+                        <span style="font-weight: bold;">${metrics.disk_percent.toFixed(1)}%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar progress-disk" style="width: ${metrics.disk_percent}%"></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="flex flex-between">
+                        <span>Active Processes</span>
+                        <span style="font-weight: bold;">${metrics.process_count}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSystemInfo() {
+            const info = machine.systemInfo || {};
+            if (!info.cpu_count) {
+                document.getElementById('systemInfo').innerHTML = '<p class="text-muted">System information not available</p>';
+                return;
+            }
+
+            document.getElementById('systemInfo').innerHTML = `
+                <div class="grid grid-2">
+                    <div>
+                        <div class="mb-2"><strong>Computer Model:</strong> ${info.computer_model || 'Unknown'}</div>
+                        <div class="mb-2"><strong>CPU Model:</strong> ${info.cpu_model || 'Unknown'}</div>
+                        <div class="mb-2"><strong>CPU Cores:</strong> ${info.cpu_count} cores</div>
+                        <div class="mb-2"><strong>Memory:</strong> ${formatBytes(info.memory_total)} ${info.memory_type ? `(${info.memory_type})` : ''}</div>
+                        <div class="mb-2"><strong>Disk:</strong> ${formatBytes(info.disk_total)}</div>
+                        ${info.disk_drives ? `<div class="mb-2"><strong>Drives:</strong> ${Array.isArray(info.disk_drives) ? info.disk_drives.join(', ') : info.disk_drives}</div>` : ''}
+                    </div>
+                    <div>
+                        <div class="mb-2"><strong>BIOS Version:</strong> ${info.bios_version || 'Unknown'}</div>
+                        <div class="mb-2"><strong>Architecture:</strong> ${info.architecture || 'Unknown'}</div>
+                        <div class="mb-2"><strong>Agent Version:</strong> v${machine.agentVersion || 'Unknown'}</div>
+                        <div class="mb-2"><strong>Uptime:</strong> ${calculateUptime()}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load and display metrics chart
+        async function loadMetrics() {
+            try {
+                const response = await fetch(`/api/metrics/${machineId}`);
+                const metrics = await response.json();
+                
+                if (metrics.error) {
+                    console.error('Metrics error:', metrics.error);
+                    return;
+                }
+
+                renderChart(metrics);
+            } catch (error) {
+                console.error('Failed to load metrics:', error);
+            }
+        }
+
+        function renderChart(metrics) {
+            const ctx = document.getElementById('metricsChart').getContext('2d');
+            
+            if (metricsChart) {
+                metricsChart.destroy();
+            }
+
+            const labels = metrics.map(m => new Date(m.timestamp).toLocaleString());
+            let data, label, color;
+
+            switch(currentMetric) {
+                case 'cpu':
+                    data = metrics.map(m => m.cpu_percent);
+                    label = 'CPU Usage (%)';
+                    color = '#d97706';
+                    break;
+                case 'memory':
+                    data = metrics.map(m => m.memory_percent);
+                    label = 'Memory Usage (%)';
+                    color = '#16a34a';
+                    break;
+                case 'disk':
+                    data = metrics.map(m => m.disk_percent);
+                    label = 'Disk Usage (%)';
+                    color = '#dc2626';
+                    break;
+                case 'process':
+                    data = metrics.map(m => m.process_count);
+                    label = 'Process Count';
+                    color = '#0891b2';
+                    break;
+            }
+
+            metricsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: color,
+                        pointBorderColor: color,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: label.includes('%') ? 100 : undefined
+                        },
+                        x: {
+                            display: false
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Metric tab switching
+        function showMetric(metric) {
+            currentMetric = metric;
+            
+            // Update tab styling
+            document.querySelectorAll('.metric-tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(`${metric}-tab`).classList.add('active');
+            
+            // Reload chart
+            loadMetrics();
+        }
+
+        // Dropdown functionality
+        function toggleDropdown(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            const isVisible = dropdown.style.display === 'block';
+            
+            // Close all dropdowns first
+            closeDropdowns();
+            
+            // Toggle the clicked dropdown
+            if (!isVisible) {
+                dropdown.style.display = 'block';
+            }
+        }
+        
+        function closeDropdowns() {
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                menu.style.display = 'none';
+            });
+        }
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.dropdown')) {
+                closeDropdowns();
+            }
+        });
+        
+        // Quick actions
+        function quickAction(action) {
+            const commands = {
+                'shutdown': {
+                    'Windows': 'shutdown /s /t 30 /c "Remote shutdown in 30 seconds"',
+                    'Linux': 'sudo shutdown -h +1 "Remote shutdown in 1 minute"'
+                },
+                'reboot': {
+                    'Windows': 'shutdown /r /t 30',
+                    'Linux': 'sudo reboot'
+                },
+                'processes': {
+                    'Windows': 'tasklist /fo table',
+                    'Linux': 'ps aux --sort=-%cpu | head -20'
+                },
+                'services': {
+                    'Windows': 'sc query state= all',
+                    'Linux': 'systemctl list-units --type=service --state=running'
+                },
+                'winupdates': {
+                    'Windows': 'powershell "$Session = New-Object -ComObject Microsoft.Update.Session; $Searcher = $Session.CreateUpdateSearcher(); $SearchResult = $Searcher.Search(\\"IsInstalled=0\\"); if($SearchResult.Updates.Count -eq 0) { Write-Output \\"No updates available\\" } else { $SearchResult.Updates | Select-Object Title, Description, @{Name=\\"Size\\";Expression={[math]::Round($_.MaxDownloadSize/1MB,2)}} | Format-Table -AutoSize }"',
+                    'Linux': 'echo "Windows Updates not available on Linux"'
+                },
+                'software': {
+                    'Windows': 'wmic product get name,version /format:table',
+                    'Linux': 'dpkg -l | head -20'
+                },
+                'network': {
+                    'Windows': 'ipconfig /all && netstat -an | findstr LISTEN',
+                    'Linux': 'ip addr show && ss -tuln'
+                },
+                'systemdetails': {
+                    'Windows': 'wmic computersystem get model,manufacturer && wmic cpu get name && wmic bios get smbiosbiosversion && wmic memorychip get memorytype,speed',
+                    'Linux': 'dmidecode -t system | grep -E "Manufacturer|Product Name" && dmidecode -t processor | grep "Version" && dmidecode -t bios | grep "Version" && dmidecode -t memory | grep -E "Type|Speed"'
+                }
+            };
+
+            const platform = machine.platform.includes('Windows') ? 'Windows' : 'Linux';
+            const command = commands[action][platform];
+
+            if (action === 'shutdown' || action === 'reboot') {
+                if (!confirm(`${action} ${machine.hostname}?`)) return;
+            }
+
+            executeCommandDirect(command);
+        }
+
+        // Terminal functions
+        function clearTerminal() {
+            document.getElementById('commandOutput').textContent = 'Ready for commands...';
+        }
+        
+        // Command execution
+        async function executeCommand() {
+            const input = document.getElementById('commandInput');
+            const command = input.value.trim();
+            if (!command) return;
+
+            executeCommandDirect(command);
+            input.value = '';
+        }
+
+        async function executeCommandDirect(command) {
+            document.getElementById('commandOutput').textContent = 'Executing command...';
+
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machineId, command })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    pollForCommandResult(result.commandId);
+                } else {
+                    document.getElementById('commandOutput').textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                document.getElementById('commandOutput').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function pollForCommandResult(commandId) {
+            let attempts = 0;
+            const maxAttempts = 20;
+
+            const poll = async () => {
+                try {
+                    const response = await fetch(`/api/command-result/${commandId}`);
+                    const data = await response.json();
+
+                    if (data.success) {
+                        const result = data.result.result;
+                        let output = '';
+
+                        if (result.stdout) output += result.stdout;
+                        if (result.stderr) output += '\\n--- STDERR ---\\n' + result.stderr;
+                        if (result.error) output = 'Error: ' + result.error;
+                        if (result.returncode !== undefined) output += `\\n--- Exit Code: ${result.returncode} ---`;
+
+                        document.getElementById('commandOutput').textContent = output || 'No output';
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(poll, 500);
+                    } else {
+                        document.getElementById('commandOutput').textContent = 'Command timed out';
+                    }
+                } catch (error) {
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(poll, 500);
+                    } else {
+                        document.getElementById('commandOutput').textContent = 'Failed to retrieve result';
+                    }
+                }
+            };
+
+            poll();
+        }
+
+        // Real-time updates
+        function toggleRealtime() {
+            const btn = document.getElementById('realtimeBtn');
+            
+            if (isRealtime) {
+                clearInterval(realtimeInterval);
+                isRealtime = false;
+                btn.textContent = 'Real-time: OFF';
+                btn.className = 'btn btn-info btn-sm';
+            } else {
+                isRealtime = true;
+                btn.textContent = 'Real-time: ON';
+                btn.className = 'btn btn-warning btn-sm';
+                
+                realtimeInterval = setInterval(() => {
+                    loadMachine();
+                    loadMetrics();
+                }, 10000);
+            }
+        }
+
+        function refreshGraphs() {
+            loadMachine();
+            loadMetrics();
+        }
+
+        // Utility functions
+        function formatBytes(bytes) {
+            if (!bytes) return 'Unknown';
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+        }
+
+        function calculateUptime() {
+            const info = machine.systemInfo || {};
+            if (!info.boot_time) return 'Unknown';
+            
+            const bootTime = new Date(info.boot_time * 1000);
+            const now = new Date();
+            const uptimeMs = now - bootTime;
+            
+            const days = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((uptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+            
+            if (days > 0) {
+                return `${days}d ${hours}h ${minutes}m`;
+            } else if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else {
+                return `${minutes}m`;
+            }
+        }
+
+        async function showAlertsModal() {
+            document.getElementById('alertsModalTitle').textContent = `Configure Alerts - ${machine.hostname}`;
+            
+            // Load current alert settings
+            try {
+                const response = await fetch(`/api/machine-alerts/${machineId}`);
+                
+                if (response.ok) {
+                    const alerts = await response.json();
+                    
+                    document.getElementById('alertsEnabled').checked = alerts.enabled || false;
+                    document.getElementById('cpuThreshold').value = alerts.cpuThreshold || 90;
+                    document.getElementById('memoryThreshold').value = alerts.memoryThreshold || 90;
+                    document.getElementById('diskThreshold').value = alerts.diskThreshold || 90;
+                    document.getElementById('offlineAlert').checked = alerts.offlineAlert !== false;
+                    document.getElementById('onlineAlert').checked = alerts.onlineAlert || false;
+                    document.getElementById('anomalyAlerts').checked = alerts.anomalyAlerts || false;
+                } else {
+                    // Default values if no settings exist
+                    document.getElementById('alertsEnabled').checked = false;
+                    document.getElementById('cpuThreshold').value = 90;
+                    document.getElementById('memoryThreshold').value = 90;
+                    document.getElementById('diskThreshold').value = 90;
+                    document.getElementById('offlineAlert').checked = true;
+                    document.getElementById('onlineAlert').checked = false;
+                    document.getElementById('anomalyAlerts').checked = false;
+                }
+                
+                toggleAlertsConfig();
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+                // Default values if error
+                document.getElementById('alertsEnabled').checked = false;
+                document.getElementById('cpuThreshold').value = 90;
+                document.getElementById('memoryThreshold').value = 90;
+                document.getElementById('diskThreshold').value = 90;
+                document.getElementById('offlineAlert').checked = true;
+                document.getElementById('onlineAlert').checked = false;
+                document.getElementById('anomalyAlerts').checked = false;
+                toggleAlertsConfig();
+            }
+            
+            document.getElementById('alertsModal').style.display = 'block';
+        }
+        
+        function toggleAlertsConfig() {
+            const enabled = document.getElementById('alertsEnabled').checked;
+            document.getElementById('alertsConfig').style.display = enabled ? 'block' : 'none';
+        }
+        
+        async function saveAlerts() {
+            const alertConfig = {
+                enabled: document.getElementById('alertsEnabled').checked,
+                cpuThreshold: parseInt(document.getElementById('cpuThreshold').value),
+                memoryThreshold: parseInt(document.getElementById('memoryThreshold').value),
+                diskThreshold: parseInt(document.getElementById('diskThreshold').value),
+                offlineAlert: document.getElementById('offlineAlert').checked,
+                onlineAlert: document.getElementById('onlineAlert').checked,
+                anomalyAlerts: document.getElementById('anomalyAlerts').checked
+            };
+            
+            try {
+                const response = await fetch(`/api/machine-alerts/${machineId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(alertConfig)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Alert configuration saved successfully');
+                    closeAlertsModal();
+                } else {
+                    alert('Failed to save alert configuration: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error saving alert configuration: ' + error.message);
+            }
+        }
+        
+        function closeAlertsModal() {
+            document.getElementById('alertsModal').style.display = 'none';
+        }
+
+        function updateAgent() {
+            if (!confirm(`Update agent on ${machine.hostname}?`)) return;
+            
+            document.getElementById('commandOutput').textContent = 'Sending update request to agent...';
+            
+            fetch('/api/update-single-agent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ machineId })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    document.getElementById('commandOutput').textContent = 'Update request sent to agent. Check console logs for progress.';
+                    // Start polling for update status
+                    pollUpdateStatus();
+                } else {
+                    document.getElementById('commandOutput').textContent = `Update failed: ${result.error}`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('commandOutput').textContent = `Update error: ${error.message}`;
+            });
+        }
+        
+        function pollUpdateStatus() {
+            let attempts = 0;
+            const maxAttempts = 30; // Poll for 5 minutes
+            
+            const poll = async () => {
+                try {
+                    const response = await fetch('/api/update-status');
+                    const statuses = await response.json();
+                    const machineStatus = statuses.find(s => s.hostname === machine.hostname);
+                    
+                    if (machineStatus) {
+                        const output = document.getElementById('commandOutput');
+                        let statusText = '';
+                        
+                        // Format status messages like console logs
+                        switch(machineStatus.status) {
+                            case 'checking':
+                                statusText = `Update status from ${machine.hostname}: checking\n[${machine.hostname}] Checking for updates...`;
+                                break;
+                            case 'updating':
+                                statusText = `Update status from ${machine.hostname}: updating\n[${machine.hostname}] Updating from ${machineStatus.currentVersion || 'unknown'} to ${machineStatus.version || 'latest'}`;
+                                break;
+                            case 'restarting':
+                                statusText = `Update status from ${machine.hostname}: restarting\n[${machine.hostname}] Update successful, restarting agent...`;
+                                break;
+                            case 'completed':
+                                statusText = `Update status from ${machine.hostname}: completed\n[${machine.hostname}] Agent updated successfully to version ${machineStatus.version || 'latest'}`;
+                                break;
+                            case 'failed':
+                                statusText = `Update status from ${machine.hostname}: failed\n[${machine.hostname}] Update failed: ${machineStatus.error || 'Unknown error'}`;
+                                break;
+                            default:
+                                statusText = `Update status from ${machine.hostname}: ${machineStatus.status}\n[${machine.hostname}] ${machineStatus.status}`;
+                        }
+                        
+                        output.textContent = statusText;
+                        
+                        // Stop polling if update is complete or failed
+                        if (machineStatus.status === 'completed' || machineStatus.status === 'failed') {
+                            return;
+                        }
+                    }
+                    
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(poll, 10000); // Poll every 10 seconds
+                    }
+                } catch (error) {
+                    console.error('Error polling update status:', error);
+                }
+            };
+            
+            // Start polling after 5 seconds
+            setTimeout(poll, 5000);
+        }
+
+        function logout() {
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => {
+                    document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                    window.location.href = '/login';
+                });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMachine();
+            
+            // Auto-refresh every 30 seconds (when not in real-time mode)
+            setInterval(() => {
+                if (!isRealtime) {
+                    loadMachine();
+                }
+            }, 30000);
+            
+            // Add event listener for alerts checkbox
+            document.getElementById('alertsEnabled').addEventListener('change', toggleAlertsConfig);
+            
+            // Close modals on outside click
+            window.onclick = function(event) {
+                const alertsModal = document.getElementById('alertsModal');
+                if (event.target === alertsModal) {
+                    closeAlertsModal();
+                }
+            };
+        });
+    </script>
+</body>
+</html>

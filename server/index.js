@@ -105,6 +105,15 @@ class RMMServer {
       }
     });
     
+    this.app.get('/machine.html', (req, res) => {
+      const sessionId = req.cookies?.session;
+      if (sessionId && this.auth.sessions.has(sessionId)) {
+        res.sendFile(path.join(__dirname, '../web/machine.html'));
+      } else {
+        res.redirect('/login');
+      }
+    });
+    
     this.app.post('/api/change-password', this.auth.requireAuth.bind(this.auth), (req, res) => {
       const { currentPassword, newPassword } = req.body;
       const success = this.auth.changePassword(req.user.username, currentPassword, newPassword);
@@ -472,9 +481,9 @@ class RMMServer {
       try {
         const { machineId } = req.params;
         const alerts = await this.db.getMachineAlerts(machineId);
-        res.json(alerts || { enabled: false, cpuThreshold: 90, memoryThreshold: 90, diskThreshold: 90, offlineAlert: true, onlineAlert: false });
+        res.json(alerts || { enabled: false, cpuThreshold: 90, memoryThreshold: 90, diskThreshold: 90, offlineAlert: true, onlineAlert: false, anomalyAlerts: false });
       } catch (error) {
-        res.json({ enabled: false, cpuThreshold: 90, memoryThreshold: 90, diskThreshold: 90, offlineAlert: true, onlineAlert: false });
+        res.json({ enabled: false, cpuThreshold: 90, memoryThreshold: 90, diskThreshold: 90, offlineAlert: true, onlineAlert: false, anomalyAlerts: false });
       }
     });
     
@@ -605,6 +614,9 @@ class RMMServer {
           this.getAgentVersion(client);
         }
         
+        // Automatically collect detailed system information
+        this.getSystemDetails(client);
+        
         ws.send(JSON.stringify({
           type: 'registered',
           id: clientId
@@ -619,17 +631,9 @@ class RMMServer {
             client.status = 'online';
             const metrics = message.metrics || {};
             
-            // Check for high resource usage alerts
+            // Check for high resource usage alerts based on per-machine settings
             const group = this.getMachineGroup(client.hostname);
-            if (metrics.cpu_percent > 89) {
-              this.discord.highResourceUsage(client.hostname, 'CPU', metrics.cpu_percent.toFixed(1), group);
-            }
-            if (metrics.memory_percent > 89) {
-              this.discord.highResourceUsage(client.hostname, 'Memory', metrics.memory_percent.toFixed(1), group);
-            }
-            if (metrics.disk_percent > 89) {
-              this.discord.highResourceUsage(client.hostname, 'Disk', metrics.disk_percent.toFixed(1), group);
-            }
+            this.checkMachineAlerts(client.id, client.hostname, metrics, group);
             
             client.metrics = metrics;
             
@@ -656,6 +660,19 @@ class RMMServer {
             console.log(`Updated agent version for ${message.hostname}: ${version}`);
           }
           delete machineClient.versionCommandId;
+        }
+        
+        // Check if this is a system details command response
+        if (machineClient && machineClient.systemDetailsCommandId === message.id) {
+          const output = message.result.stdout || '';
+          const systemDetails = this.parseSystemDetails(output, machineClient.platform);
+          
+          // Update system info with new details
+          machineClient.systemInfo = { ...machineClient.systemInfo, ...systemDetails };
+          this.db.updateMachine(machineClient.id, machineClient.hostname, machineClient.platform, machineClient.status, machineClient.systemInfo, machineClient.agentVersion);
+          console.log(`Updated system details for ${message.hostname}`);
+          
+          delete machineClient.systemDetailsCommandId;
         }
         
         // Store result for web client retrieval
@@ -756,6 +773,35 @@ class RMMServer {
     return 'Unknown';
   }
   
+  async checkMachineAlerts(machineId, hostname, metrics, group) {
+    try {
+      const alertConfig = await this.db.getMachineAlerts(machineId);
+      
+      // If alerts are disabled for this machine, don't send any alerts
+      if (!alertConfig || !alertConfig.enabled) {
+        return;
+      }
+      
+      // Check CPU threshold
+      if (metrics.cpu_percent > alertConfig.cpuThreshold) {
+        this.discord.highResourceUsage(hostname, 'CPU', metrics.cpu_percent.toFixed(1), group);
+      }
+      
+      // Check Memory threshold
+      if (metrics.memory_percent > alertConfig.memoryThreshold) {
+        this.discord.highResourceUsage(hostname, 'Memory', metrics.memory_percent.toFixed(1), group);
+      }
+      
+      // Check Disk threshold
+      if (metrics.disk_percent > alertConfig.diskThreshold) {
+        this.discord.highResourceUsage(hostname, 'Disk', metrics.disk_percent.toFixed(1), group);
+      }
+      
+    } catch (error) {
+      console.error('Error checking machine alerts:', error);
+    }
+  }
+  
   getAgentVersion(client) {
     if (client.ws.readyState !== WebSocket.OPEN) return;
     
@@ -775,6 +821,25 @@ class RMMServer {
     client.versionCommandId = commandId;
   }
   
+  getSystemDetails(client) {
+    if (client.ws.readyState !== WebSocket.OPEN) return;
+    
+    const isWindows = client.platform.includes('Windows');
+    const systemCommand = isWindows ?
+      'echo COMPUTER: && wmic computersystem get model,manufacturer /format:list | findstr = && echo CPU: && wmic cpu get name /format:list | findstr = && echo BIOS: && wmic bios get smbiosbiosversion /format:list | findstr = && echo MEMORY: && wmic memorychip get memorytype,speed /format:list | findstr = && echo DISK: && wmic diskdrive get model,mediatype,size /format:list | findstr =' :
+      'echo COMPUTER: && dmidecode -t system 2>/dev/null | grep -E "Manufacturer|Product Name" && echo CPU: && dmidecode -t processor 2>/dev/null | grep "Version" | head -1 && echo BIOS: && dmidecode -t bios 2>/dev/null | grep "Version" | head -1 && echo MEMORY: && dmidecode -t memory 2>/dev/null | grep -E "Type|Speed" | head -2 && echo DISK: && lsblk -d -o NAME,ROTA,SIZE,MODEL 2>/dev/null';
+    
+    const commandId = uuidv4();
+    client.ws.send(JSON.stringify({
+      type: 'command',
+      id: commandId,
+      command: systemCommand
+    }));
+    
+    // Store command ID to identify system details response
+    client.systemDetailsCommandId = commandId;
+  }
+  
   startTrendAnalysis() {
     // Run trend analysis every 30 minutes
     setInterval(async () => {
@@ -790,6 +855,12 @@ class RMMServer {
   
   async checkMetricAnomalies(machineId, hostname, currentMetrics) {
     try {
+      // Check if anomaly alerts are enabled for this machine
+      const alertConfig = await this.db.getMachineAlerts(machineId);
+      if (!alertConfig || !alertConfig.enabled || !alertConfig.anomalyAlerts) {
+        return;
+      }
+      
       // Get baseline for comparison
       const cpuBaseline = await this.db.calculateBaseline(machineId, 'cpu_percent');
       const memoryBaseline = await this.db.calculateBaseline(machineId, 'memory_percent');
@@ -858,6 +929,127 @@ class RMMServer {
     } catch (error) {
       console.error('Error analyzing trends:', error);
     }
+  }
+
+  parseSystemDetails(output, platform) {
+    const details = {};
+    
+    if (platform.includes('Windows')) {
+      // Parse Windows WMI output
+      if (output.includes('Manufacturer=')) {
+        const manufacturer = output.match(/Manufacturer=([^\r\n]+)/)?.[1]?.trim();
+        const model = output.match(/Model=([^\r\n]+)/)?.[1]?.trim();
+        if (manufacturer && model) {
+          details.computer_model = `${manufacturer} ${model}`;
+        }
+      }
+      
+      if (output.includes('Name=') && output.includes('CPU:')) {
+        const cpuMatch = output.match(/CPU:[\s\S]*?Name=([^\r\n]+)/)?.[1]?.trim();
+        if (cpuMatch) {
+          details.cpu_model = cpuMatch;
+        }
+      }
+      
+      if (output.includes('SMBIOSBIOSVersion=')) {
+        const biosMatch = output.match(/SMBIOSBIOSVersion=([^\r\n]+)/)?.[1]?.trim();
+        if (biosMatch) {
+          details.bios_version = biosMatch;
+        }
+      }
+      
+      if (output.includes('MemoryType=')) {
+        const memoryTypeMatch = output.match(/MemoryType=([^\r\n]+)/)?.[1]?.trim();
+        if (memoryTypeMatch && memoryTypeMatch !== '0') {
+          // Convert memory type number to readable format
+          const memoryTypes = { '20': 'DDR', '21': 'DDR2', '24': 'DDR3', '26': 'DDR4', '34': 'DDR5' };
+          details.memory_type = memoryTypes[memoryTypeMatch] || `Type ${memoryTypeMatch}`;
+        }
+      }
+      
+      if (output.includes('DISK:') && output.includes('Model=')) {
+        const diskModels = [];
+        const diskTypes = [];
+        const modelMatches = output.match(/Model=([^\r\n]+)/g) || [];
+        const mediaMatches = output.match(/MediaType=([^\r\n]+)/g) || [];
+        
+        modelMatches.forEach((match, index) => {
+          const model = match.replace('Model=', '').trim();
+          if (model && !model.includes('COMPUTER:') && !model.includes('CPU:')) {
+            diskModels.push(model);
+            
+            const mediaType = mediaMatches[index]?.replace('MediaType=', '').trim();
+            if (mediaType === 'Fixed hard disk media') {
+              // Check if SSD based on model name
+              const isSSD = /SSD|Solid|NVMe|M\.2/i.test(model);
+              diskTypes.push(isSSD ? 'SSD' : 'HDD');
+            } else {
+              diskTypes.push('Unknown');
+            }
+          }
+        });
+        
+        if (diskModels.length > 0) {
+          details.disk_drives = diskModels.map((model, i) => `${model} (${diskTypes[i] || 'Unknown'})`);
+        }
+      }
+    } else {
+      // Parse Linux dmidecode output
+      if (output.includes('Manufacturer:')) {
+        const manufacturer = output.match(/Manufacturer:\s*([^\r\n]+)/)?.[1]?.trim();
+        const product = output.match(/Product Name:\s*([^\r\n]+)/)?.[1]?.trim();
+        if (manufacturer && product) {
+          details.computer_model = `${manufacturer} ${product}`;
+        }
+      }
+      
+      if (output.includes('CPU:') && output.includes('Version:')) {
+        const cpuMatch = output.match(/CPU:[\s\S]*?Version:\s*([^\r\n]+)/)?.[1]?.trim();
+        if (cpuMatch) {
+          details.cpu_model = cpuMatch;
+        }
+      }
+      
+      if (output.includes('BIOS:') && output.includes('Version:')) {
+        const biosMatch = output.match(/BIOS:[\s\S]*?Version:\s*([^\r\n]+)/)?.[1]?.trim();
+        if (biosMatch) {
+          details.bios_version = biosMatch;
+        }
+      }
+      
+      if (output.includes('MEMORY:') && output.includes('Type:')) {
+        const memoryMatch = output.match(/MEMORY:[\s\S]*?Type:\s*([^\r\n]+)/)?.[1]?.trim();
+        if (memoryMatch && memoryMatch !== 'Unknown') {
+          details.memory_type = memoryMatch;
+        }
+      }
+      
+      if (output.includes('DISK:')) {
+        const diskLines = output.split('DISK:')[1]?.split('\n').filter(line => line.trim()) || [];
+        const diskDrives = [];
+        
+        diskLines.forEach(line => {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length >= 4) {
+            const name = parts[0];
+            const rota = parts[1]; // 1 = HDD, 0 = SSD
+            const size = parts[2];
+            const model = parts.slice(3).join(' ');
+            
+            if (name && rota !== undefined && model) {
+              const type = rota === '1' ? 'HDD' : 'SSD';
+              diskDrives.push(`${model} (${type})`);
+            }
+          }
+        });
+        
+        if (diskDrives.length > 0) {
+          details.disk_drives = diskDrives;
+        }
+      }
+    }
+    
+    return details;
   }
 
   start(port = 3000) {

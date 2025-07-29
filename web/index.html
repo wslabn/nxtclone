@@ -132,6 +132,15 @@
                                     Alert when machine comes back online
                                 </label>
                             </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" id="anomalyAlerts" style="margin-right: 0.5rem;">
+                                    Enable anomaly detection alerts (CPU/Memory spikes)
+                                </label>
+                            </div>
+                            
+
                         </div>
                     </form>
                 </div>
@@ -254,7 +263,7 @@
                     <div class="card-header">
                         <div class="flex flex-between">
                             <div>
-                                <h3 class="card-title">${machine.hostname}</h3>
+                                <h3 class="card-title"><a href="/machine.html?id=${machine.id}" style="text-decoration: none; color: inherit;">${machine.hostname}</a></h3>
                                 <div class="flex" style="align-items: center; gap: 0.5rem;">
                                     <div class="status-dot status-${machine.status}"></div>
                                     <span class="badge badge-${machine.status === 'online' ? 'success' : 'danger'}">${machine.status.toUpperCase()}</span>
@@ -672,7 +681,7 @@
                                     
                                     return `
                                         <tr>
-                                            <td><strong>${machine.hostname}</strong></td>
+                                            <td><strong><a href="/machine.html?id=${machine.id}" style="text-decoration: none; color: inherit;">${machine.hostname}</a></strong></td>
                                             <td>
                                                 <div class="flex" style="align-items: center; gap: 0.5rem;">
                                                     <div class="status-dot status-${machine.status}"></div>
@@ -718,8 +727,11 @@
             // Load current alert settings
             try {
                 const response = await fetch(`/api/machine-alerts/${machineId}`);
+                console.log('Alerts API response status:', response.status);
+                
                 if (response.ok) {
                     const alerts = await response.json();
+                    console.log('Alerts data received:', alerts);
                     
                     document.getElementById('alertsEnabled').checked = alerts.enabled || false;
                     document.getElementById('cpuThreshold').value = alerts.cpuThreshold || 90;
@@ -727,7 +739,9 @@
                     document.getElementById('diskThreshold').value = alerts.diskThreshold || 90;
                     document.getElementById('offlineAlert').checked = alerts.offlineAlert !== false;
                     document.getElementById('onlineAlert').checked = alerts.onlineAlert || false;
+                    document.getElementById('anomalyAlerts').checked = alerts.anomalyAlerts || false;
                 } else {
+                    console.log('No existing alerts config, using defaults');
                     // Default values if no settings exist
                     document.getElementById('alertsEnabled').checked = false;
                     document.getElementById('cpuThreshold').value = 90;
@@ -735,6 +749,7 @@
                     document.getElementById('diskThreshold').value = 90;
                     document.getElementById('offlineAlert').checked = true;
                     document.getElementById('onlineAlert').checked = false;
+                    document.getElementById('anomalyAlerts').checked = false;
                 }
                 
                 toggleAlertsConfig();
@@ -747,6 +762,7 @@
                 document.getElementById('diskThreshold').value = 90;
                 document.getElementById('offlineAlert').checked = true;
                 document.getElementById('onlineAlert').checked = false;
+                document.getElementById('anomalyAlerts').checked = false;
                 toggleAlertsConfig();
             }
             
@@ -767,7 +783,8 @@
                 memoryThreshold: parseInt(document.getElementById('memoryThreshold').value),
                 diskThreshold: parseInt(document.getElementById('diskThreshold').value),
                 offlineAlert: document.getElementById('offlineAlert').checked,
-                onlineAlert: document.getElementById('onlineAlert').checked
+                onlineAlert: document.getElementById('onlineAlert').checked,
+                anomalyAlerts: document.getElementById('anomalyAlerts').checked
             };
             
             try {

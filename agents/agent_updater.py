@@ -240,29 +240,200 @@ class AgentUpdater:
             print(f"Control app update failed: {e}")
     
     def restart_agent(self):
-        """Restart the current agent process"""
+        """Restart the current agent process with robust error handling"""
         try:
             if sys.platform.startswith('win'):
-                # Check if update batch script exists
-                script_path = sys.argv[0] + ".update.bat"
-                if os.path.exists(script_path):
-                    # Stop service and run update script
-                    subprocess.run(['sc', 'stop', 'SysWatch Agent'], check=False, capture_output=True)
-                    subprocess.Popen([script_path], shell=True)
-                    print("Running update script and exiting")
-                else:
-                    # Normal service restart
-                    subprocess.run(['sc', 'stop', 'SysWatch Agent'], check=False, capture_output=True)
-                    subprocess.run(['sc', 'start', 'SysWatch Agent'], check=False, capture_output=True)
-                    print("Service restart initiated")
+                return self.restart_windows_service()
             else:
-                # Linux: Use systemd service restart
-                subprocess.run(['sudo', 'systemctl', 'restart', 'syswatch-agent'], check=False, capture_output=True)
-                print("Service restart initiated")
-            
-            # Exit current process
-            sys.exit(0)
-            
+                return self.restart_linux_service()
         except Exception as e:
             print(f"Restart failed: {e}")
+            return False
+    
+    def restart_windows_service(self):
+        """Restart Windows service with NSSM failure handling"""
+        service_name = "SysWatchAgent"  # Updated service name
+        
+        # Check if update batch script exists
+        script_path = sys.argv[0] + ".update.bat"
+        if os.path.exists(script_path):
+            print("Running update script with robust restart...")
+            # Create enhanced batch script with NSSM failure handling
+            self.create_robust_update_script(script_path, service_name)
+            subprocess.Popen([script_path], shell=True)
+            print("Enhanced update script started")
+            sys.exit(0)
+        else:
+            # Normal service restart with retry logic
+            return self.restart_service_with_retry(service_name)
+    
+    def create_robust_update_script(self, script_path, service_name):
+        """Create enhanced batch script with NSSM failure handling"""
+        install_dir = os.path.dirname(sys.argv[0])
+        nssm_path = os.path.join(install_dir, "nssm.exe")
+        
+        with open(script_path, 'w') as f:
+            f.write('@echo off\n')
+            f.write('echo Starting robust agent update...\n')
+            f.write('timeout /t 3 /nobreak >nul\n')
+            
+            # Replace executable
+            f.write(f'echo Replacing agent executable...\n')
+            f.write(f'move "{sys.argv[0] + ".new"}" "{sys.argv[0]}"\n')
+            f.write('if errorlevel 1 (\n')
+            f.write('    echo Failed to replace executable\n')
+            f.write('    goto cleanup\n')
+            f.write(')\n')
+            
+            # Try multiple restart methods
+            f.write('echo Attempting service restart...\n')
+            
+            # Method 1: Try sc commands first (more reliable)
+            f.write(f'sc stop "{service_name}" >nul 2>&1\n')
+            f.write('timeout /t 5 /nobreak >nul\n')
+            f.write(f'sc start "{service_name}" >nul 2>&1\n')
+            f.write('if not errorlevel 1 (\n')
+            f.write('    echo Service restarted successfully with sc\n')
+            f.write('    goto cleanup\n')
+            f.write(')\n')
+            
+            # Method 2: Try NSSM if sc fails
+            f.write('echo SC restart failed, trying NSSM...\n')
+            f.write(f'"{nssm_path}" stop "{service_name}" >nul 2>&1\n')
+            f.write('timeout /t 5 /nobreak >nul\n')
+            f.write(f'"{nssm_path}" start "{service_name}" >nul 2>&1\n')
+            f.write('if not errorlevel 1 (\n')
+            f.write('    echo Service restarted successfully with NSSM\n')
+            f.write('    goto cleanup\n')
+            f.write(')\n')
+            
+            # Method 3: Try net commands as fallback
+            f.write('echo NSSM restart failed, trying net commands...\n')
+            f.write(f'net stop "{service_name}" >nul 2>&1\n')
+            f.write('timeout /t 5 /nobreak >nul\n')
+            f.write(f'net start "{service_name}" >nul 2>&1\n')
+            f.write('if not errorlevel 1 (\n')
+            f.write('    echo Service restarted successfully with net\n')
+            f.write('    goto cleanup\n')
+            f.write(')\n')
+            
+            # Method 4: Try to reinstall service if all else fails
+            f.write('echo All restart methods failed, attempting service reinstall...\n')
+            f.write(f'"{nssm_path}" remove "{service_name}" confirm >nul 2>&1\n')
+            f.write('timeout /t 2 /nobreak >nul\n')
+            f.write(f'"{nssm_path}" install "{service_name}" "{sys.argv[0]}" >nul 2>&1\n')
+            f.write(f'"{nssm_path}" set "{service_name}" Start SERVICE_AUTO_START >nul 2>&1\n')
+            f.write(f'"{nssm_path}" start "{service_name}" >nul 2>&1\n')
+            f.write('if not errorlevel 1 (\n')
+            f.write('    echo Service reinstalled and started successfully\n')
+            f.write(') else (\n')
+            f.write('    echo All restart methods failed - manual intervention required\n')
+            f.write(')\n')
+            
+            # Cleanup
+            f.write(':cleanup\n')
+            f.write('echo Update process completed\n')
+            f.write(f'del "{script_path}" >nul 2>&1\n')
+            f.write(f'del "{sys.argv[0] + ".backup"}" >nul 2>&1\n')
+    
+    def restart_service_with_retry(self, service_name, max_retries=3):
+        """Restart service with multiple methods and retry logic"""
+        methods = [
+            lambda: self.restart_with_sc(service_name),
+            lambda: self.restart_with_nssm(service_name),
+            lambda: self.restart_with_net(service_name)
+        ]
+        
+        for attempt in range(max_retries):
+            for i, method in enumerate(methods):
+                try:
+                    print(f"Restart attempt {attempt + 1}, method {i + 1}")
+                    if method():
+                        print(f"Service restarted successfully with method {i + 1}")
+                        return True
+                except Exception as e:
+                    print(f"Method {i + 1} failed: {e}")
+                    continue
+            
+            if attempt < max_retries - 1:
+                print(f"All methods failed, waiting before retry {attempt + 2}...")
+                import time
+                time.sleep(5)
+        
+        print("All restart attempts failed")
+        return False
+    
+    def restart_with_sc(self, service_name):
+        """Restart using sc commands"""
+        stop_result = subprocess.run(['sc', 'stop', service_name], 
+                                   capture_output=True, text=True, timeout=30)
+        
+        # Wait for service to stop
+        import time
+        time.sleep(5)
+        
+        start_result = subprocess.run(['sc', 'start', service_name], 
+                                    capture_output=True, text=True, timeout=30)
+        
+        return start_result.returncode == 0
+    
+    def restart_with_nssm(self, service_name):
+        """Restart using NSSM (with error handling)"""
+        install_dir = os.path.dirname(sys.argv[0])
+        nssm_path = os.path.join(install_dir, "nssm.exe")
+        
+        if not os.path.exists(nssm_path):
+            return False
+        
+        try:
+            stop_result = subprocess.run([nssm_path, 'stop', service_name], 
+                                       capture_output=True, text=True, timeout=30)
+            
+            # Wait for service to stop
+            import time
+            time.sleep(5)
+            
+            start_result = subprocess.run([nssm_path, 'start', service_name], 
+                                        capture_output=True, text=True, timeout=30)
+            
+            return start_result.returncode == 0
+        except subprocess.TimeoutExpired:
+            print("NSSM command timed out")
+            return False
+        except Exception as e:
+            print(f"NSSM restart failed: {e}")
+            return False
+    
+    def restart_with_net(self, service_name):
+        """Restart using net commands"""
+        try:
+            stop_result = subprocess.run(['net', 'stop', service_name], 
+                                       capture_output=True, text=True, timeout=30)
+            
+            # Wait for service to stop
+            import time
+            time.sleep(5)
+            
+            start_result = subprocess.run(['net', 'start', service_name], 
+                                        capture_output=True, text=True, timeout=30)
+            
+            return start_result.returncode == 0
+        except Exception as e:
+            print(f"Net restart failed: {e}")
+            return False
+    
+    def restart_linux_service(self):
+        """Restart Linux service with retry logic"""
+        try:
+            result = subprocess.run(['sudo', 'systemctl', 'restart', 'syswatch-agent'], 
+                                  capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print("Linux service restarted successfully")
+                return True
+            else:
+                print(f"Linux service restart failed: {result.stderr}")
+                return False
+        except Exception as e:
+            print(f"Linux service restart failed: {e}")
             return False
