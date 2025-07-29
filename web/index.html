@@ -232,7 +232,10 @@
                 console.log('Dashboard loaded machines:', machines);
                 renderMachines();
                 // Render charts after machines are loaded
-                setTimeout(renderFleetCharts, 100);
+                setTimeout(() => {
+                    console.log('Timeout callback, calling renderFleetCharts');
+                    renderFleetCharts();
+                }, 500);
             } catch (error) {
                 console.error('Failed to load machines:', error);
             }
@@ -349,15 +352,23 @@
         }
         
         function renderFleetCharts() {
-            if (machines.length === 0) return;
+            console.log('renderFleetCharts called, machines:', machines.length);
+            if (machines.length === 0) {
+                console.log('No machines, skipping charts');
+                return;
+            }
             
             // Status Chart
-            const statusCtx = document.getElementById('statusChart')?.getContext('2d');
+            const statusCanvas = document.getElementById('statusChart');
+            console.log('Status canvas found:', !!statusCanvas);
+            const statusCtx = statusCanvas?.getContext('2d');
             if (statusCtx) {
                 const online = machines.filter(m => m.status === 'online').length;
                 const offline = machines.length - online;
                 
-                if (window.statusChart) window.statusChart.destroy();
+                if (window.statusChart && typeof window.statusChart.destroy === 'function') {
+                    window.statusChart.destroy();
+                }
                 window.statusChart = new Chart(statusCtx, {
                     type: 'doughnut',
                     data: {
@@ -381,7 +392,9 @@
             }
             
             // Platform Chart
-            const platformCtx = document.getElementById('platformChart')?.getContext('2d');
+            const platformCanvas = document.getElementById('platformChart');
+            console.log('Platform canvas found:', !!platformCanvas);
+            const platformCtx = platformCanvas?.getContext('2d');
             if (platformCtx) {
                 const platforms = {};
                 machines.forEach(m => {
@@ -392,7 +405,9 @@
                     platforms[platform] = (platforms[platform] || 0) + 1;
                 });
                 
-                if (window.platformChart) window.platformChart.destroy();
+                if (window.platformChart && typeof window.platformChart.destroy === 'function') {
+                    window.platformChart.destroy();
+                }
                 window.platformChart = new Chart(platformCtx, {
                     type: 'bar',
                     data: {
