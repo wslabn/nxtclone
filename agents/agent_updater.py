@@ -204,6 +204,10 @@ def main():
     if len(sys.argv) != 3: sys.exit(1)
     new_exe, target_exe = sys.argv[1], sys.argv[2]
     
+    # Ensure temp directory exists
+    if not os.path.exists("C:\\temp"):
+        os.makedirs("C:\\temp")
+    
     # Stop service
     subprocess.run(['sc', 'stop', 'SysWatchAgent'], capture_output=True)
     subprocess.run(['taskkill', '/f', '/im', 'syswatch-agent-windows.exe'], capture_output=True)

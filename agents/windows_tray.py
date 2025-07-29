@@ -43,23 +43,41 @@ class SysWatchTray:
             import subprocess
             import re
             
-            # Try tasklist method (most reliable)
+            print("Attempting to detect server URL from running agent...")
+            
+            # Method 1: Try tasklist with verbose output
             result = subprocess.run(['tasklist', '/v', '/fi', 'imagename eq syswatch-agent-windows.exe'], 
                                   capture_output=True, text=True)
+            print(f"Tasklist output: {result.stdout[:200]}...")
             
-            # Look for ws:// in the output
             match = re.search(r'ws://[^\s"]+', result.stdout)
             if match:
+                print(f"Found URL via tasklist: {match.group(0)}")
                 return match.group(0)
             
-            # Fallback: try wmic with simpler format
+            # Method 2: Try wmic command line
             result = subprocess.run(['wmic', 'process', 'where', 'name="syswatch-agent-windows.exe"', 
-                                   'get', 'commandline'], capture_output=True, text=True)
+                                   'get', 'commandline', '/format:list'], capture_output=True, text=True)
+            print(f"WMIC output: {result.stdout[:200]}...")
             
             match = re.search(r'ws://[^\s"]+', result.stdout)
             if match:
+                print(f"Found URL via wmic: {match.group(0)}")
+                return match.group(0)
+            
+            # Method 3: Try PowerShell Get-Process
+            result = subprocess.run([
+                'powershell', '-Command',
+                'Get-Process syswatch-agent-windows -ErrorAction SilentlyContinue | Select-Object CommandLine'
+            ], capture_output=True, text=True)
+            print(f"PowerShell output: {result.stdout[:200]}...")
+            
+            match = re.search(r'ws://[^\s"]+', result.stdout)
+            if match:
+                print(f"Found URL via PowerShell: {match.group(0)}")
                 return match.group(0)
                 
+            print("No server URL found in any process output")
             return None
         except Exception as e:
             print(f"Error getting server URL: {e}")
@@ -266,6 +284,17 @@ class SysWatchTray:
 
 if __name__ == "__main__":
     try:
+        # Check if another instance is already running
+        import psutil
+        current_pid = os.getpid()
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                if proc.info['name'] == 'syswatch-tray.exe' and proc.info['pid'] != current_pid:
+                    print("Another instance of SysWatch Tray is already running")
+                    sys.exit(0)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        
         app = SysWatchTray()
         app.run()
     except KeyboardInterrupt:

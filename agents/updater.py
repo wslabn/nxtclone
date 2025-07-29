@@ -82,6 +82,12 @@ def main():
     service_name = "SysWatchAgent"
     process_name = "syswatch-agent-windows.exe"
     
+    # Ensure temp directory exists
+    temp_dir = "C:\\temp"
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+        print(f"Created temp directory: {temp_dir}")
+    
     print("SysWatch Agent Updater")
     print(f"Updating: {target_exe}")
     print(f"From: {new_exe}")
@@ -120,7 +126,7 @@ def main():
     time.sleep(2)
     try:
         # Schedule self-deletion
-        batch_script = os.path.join(os.path.dirname(__file__), "cleanup.bat")
+        batch_script = "C:\\temp\\cleanup.bat"
         with open(batch_script, 'w') as f:
             f.write('@echo off\n')
             f.write('timeout /t 3 /nobreak >nul\n')

@@ -102,16 +102,21 @@ Section "install"
     IfFileExists "$INSTDIR\syswatch-agent-windows.exe" +2 0
     MessageBox MB_OK "Error: Agent executable not found after copy!"
     
-    # Stop existing service if running
-    ExecWait 'sc stop "${APPNAME}"'
-    ExecWait 'sc delete "${APPNAME}"'
+    # Check if service exists and stop it if running
+    DetailPrint "Checking for existing service..."
+    ExecWait 'sc query "${APPNAME}"' $8
+    ${If} $8 == 0
+        DetailPrint "Existing service found, stopping..."
+        ExecWait 'sc stop "${APPNAME}"' $9
+        Sleep 3000
+        DetailPrint "Removing existing service..."
+        ExecWait 'sc delete "${APPNAME}"' $9
+        Sleep 2000
+    ${Else}
+        DetailPrint "No existing service found"
+    ${EndIf}
     
-    # Stop and delete any existing service first
-    ExecWait 'sc stop "${APPNAME}"' $9
-    ExecWait 'sc delete "${APPNAME}"' $9
-    
-    # Wait for service deletion to complete
-    Sleep 2000
+
     
     # Copy NSSM (include nssm.exe in build/dist/)
     File /nonfatal "dist\nssm.exe"
@@ -175,9 +180,16 @@ Section "install"
 SectionEnd
 
 Section "uninstall"
-    # Stop and remove NSSM service
-    ExecWait '"$INSTDIR\nssm.exe" stop "${APPNAME}"'
-    ExecWait '"$INSTDIR\nssm.exe" remove "${APPNAME}" confirm'
+    # Check if service exists before trying to stop/remove it
+    ExecWait 'sc query "${APPNAME}"' $8
+    ${If} $8 == 0
+        DetailPrint "Service found, stopping and removing..."
+        ExecWait '"$INSTDIR\nssm.exe" stop "${APPNAME}"'
+        Sleep 3000
+        ExecWait '"$INSTDIR\nssm.exe" remove "${APPNAME}" confirm'
+    ${Else}
+        DetailPrint "Service not found, skipping service removal"
+    ${EndIf}
     
     # Remove files
     Delete "$INSTDIR\syswatch-agent-windows.exe"
