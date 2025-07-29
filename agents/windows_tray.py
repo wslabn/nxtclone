@@ -18,50 +18,51 @@ class SysWatchTray:
     def load_config(self):
         try:
             # First try to get server URL from running agent process
-            self.server_url = self.get_agent_server_url()
+            detected_url = self.get_agent_server_url()
+            print(f"Detected server URL from process: {detected_url}")
             
-            # Fallback to config file
-            if not self.server_url or self.server_url == 'ws://localhost:3000':
+            if detected_url:
+                self.server_url = detected_url
+            else:
+                # Fallback to config file
                 if self.config_file.exists():
                     with open(self.config_file, 'r') as f:
                         config = json.load(f)
                         self.server_url = config.get('server_url', 'ws://localhost:3000')
                 else:
                     self.server_url = 'ws://localhost:3000'
-        except:
+            
+            print(f"Final server URL: {self.server_url}")
+        except Exception as e:
+            print(f"Error loading config: {e}")
             self.server_url = 'ws://localhost:3000'
     
     def get_agent_server_url(self):
         """Get server URL from running agent process"""
         try:
             import subprocess
-            # Try PowerShell method first (more reliable)
-            result = subprocess.run([
-                'powershell', '-Command', 
-                'Get-WmiObject Win32_Process | Where-Object {$_.Name -eq "syswatch-agent-windows.exe"} | Select-Object CommandLine'
-            ], capture_output=True, text=True)
+            import re
             
-            for line in result.stdout.split('\n'):
-                if 'ws://' in line:
-                    # Extract URL from command line
-                    import re
-                    match = re.search(r'ws://[^\s]+', line)
-                    if match:
-                        return match.group(0)
-            
-            # Fallback to wmic
-            result = subprocess.run(['wmic', 'process', 'where', 'name="syswatch-agent-windows.exe"', 
-                                   'get', 'commandline', '/format:list'], 
+            # Try tasklist method (most reliable)
+            result = subprocess.run(['tasklist', '/v', '/fi', 'imagename eq syswatch-agent-windows.exe'], 
                                   capture_output=True, text=True)
             
-            for line in result.stdout.split('\n'):
-                if 'CommandLine=' in line and 'ws://' in line:
-                    import re
-                    match = re.search(r'ws://[^\s]+', line)
-                    if match:
-                        return match.group(0)
+            # Look for ws:// in the output
+            match = re.search(r'ws://[^\s"]+', result.stdout)
+            if match:
+                return match.group(0)
+            
+            # Fallback: try wmic with simpler format
+            result = subprocess.run(['wmic', 'process', 'where', 'name="syswatch-agent-windows.exe"', 
+                                   'get', 'commandline'], capture_output=True, text=True)
+            
+            match = re.search(r'ws://[^\s"]+', result.stdout)
+            if match:
+                return match.group(0)
+                
             return None
-        except:
+        except Exception as e:
+            print(f"Error getting server URL: {e}")
             return None
     
     def save_config(self):
