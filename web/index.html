@@ -40,6 +40,26 @@
             </div>
         </div>
 
+        <!-- Fleet Overview -->
+        <div class="grid grid-2 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Fleet Status</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusChart" style="height: 200px;"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Platform Distribution</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="platformChart" style="height: 200px;"></canvas>
+                </div>
+            </div>
+        </div>
+        
         <!-- Summary Cards -->
         <div class="grid grid-4 mb-4" id="summary"></div>
 
@@ -211,6 +231,8 @@
                 machines = await response.json();
                 console.log('Dashboard loaded machines:', machines);
                 renderMachines();
+                // Render charts after machines are loaded
+                setTimeout(renderFleetCharts, 100);
             } catch (error) {
                 console.error('Failed to load machines:', error);
             }
@@ -255,8 +277,10 @@
 
             filteredMachines.forEach(machine => {
                 const machineCard = document.createElement('div');
-                machineCard.className = 'card mb-3';
+                machineCard.className = 'card mb-3 machine-card';
                 machineCard.style.borderLeft = `4px solid ${machine.status === 'online' ? 'var(--success)' : 'var(--danger)'}`;
+                machineCard.style.cursor = 'pointer';
+                machineCard.onclick = () => showMachineModal(machine.id);
                 
                 const lastSeen = new Date(machine.lastSeen).toLocaleString();
                 
@@ -289,6 +313,8 @@
             const summary = document.getElementById('summary');
             const online = machines.filter(m => m.status === 'online').length;
             const offline = machines.length - online;
+            const avgCpu = machines.filter(m => m.metrics?.cpu_percent).reduce((sum, m) => sum + m.metrics.cpu_percent, 0) / machines.filter(m => m.metrics?.cpu_percent).length || 0;
+            const avgMemory = machines.filter(m => m.metrics?.memory_percent).reduce((sum, m) => sum + m.metrics.memory_percent, 0) / machines.filter(m => m.metrics?.memory_percent).length || 0;
             
             summary.innerHTML = `
                 <div class="card text-center">
@@ -305,17 +331,94 @@
                 </div>
                 <div class="card text-center">
                     <div class="card-body">
-                        <div style="font-size: 2rem; font-weight: bold;">${machines.length}</div>
-                        <div class="text-muted">Total</div>
+                        <div style="font-size: 2rem; font-weight: bold; color: var(--warning);">${avgCpu.toFixed(1)}%</div>
+                        <div class="text-muted">Avg CPU</div>
                     </div>
                 </div>
                 <div class="card text-center">
                     <div class="card-body">
-                        <div style="font-size: 2rem; font-weight: bold; color: var(--info);">${Object.keys(groups).length}</div>
-                        <div class="text-muted">Groups</div>
+                        <div style="font-size: 2rem; font-weight: bold; color: var(--info);">${avgMemory.toFixed(1)}%</div>
+                        <div class="text-muted">Avg Memory</div>
                     </div>
                 </div>
             `;
+        }
+        
+        function renderFleetCharts() {
+            if (machines.length === 0) return;
+            
+            // Status Chart
+            const statusCtx = document.getElementById('statusChart')?.getContext('2d');
+            if (statusCtx) {
+                const online = machines.filter(m => m.status === 'online').length;
+                const offline = machines.length - online;
+                
+                if (window.statusChart) window.statusChart.destroy();
+                window.statusChart = new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Online', 'Offline'],
+                        datasets: [{
+                            data: [online, offline],
+                            backgroundColor: ['#28a745', '#dc3545'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Platform Chart
+            const platformCtx = document.getElementById('platformChart')?.getContext('2d');
+            if (platformCtx) {
+                const platforms = {};
+                machines.forEach(m => {
+                    const platform = m.platform.includes('Windows-11') ? 'Windows 11' :
+                                   m.platform.includes('Windows-10') ? 'Windows 10' :
+                                   m.platform.includes('Windows') ? 'Windows' :
+                                   m.platform.includes('Linux') ? 'Linux' : 'Other';
+                    platforms[platform] = (platforms[platform] || 0) + 1;
+                });
+                
+                if (window.platformChart) window.platformChart.destroy();
+                window.platformChart = new Chart(platformCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(platforms),
+                        datasets: [{
+                            label: 'Machines',
+                            data: Object.values(platforms),
+                            backgroundColor: ['#007bff', '#17a2b8', '#6f42c1', '#e83e8c'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
+                });
+            }
         }
 
         function renderSystemInfo(machine) {
@@ -682,8 +785,8 @@
                                     const disabled = machine.status === 'offline';
                                     
                                     return `
-                                        <tr>
-                                            <td><strong><a href="/machine.html?id=${machine.id}" style="text-decoration: none; color: inherit;">${machine.hostname}</a></strong></td>
+                                        <tr class="machine-row" style="cursor: pointer;" onclick="showMachineModal('${machine.id}')">
+                                            <td><strong>${machine.hostname}</strong></td>
                                             <td>
                                                 <div class="flex" style="align-items: center; gap: 0.5rem;">
                                                     <div class="status-dot status-${machine.status}"></div>
@@ -811,6 +914,89 @@
         function closeAlertsModal() {
             document.getElementById('alertsModal').style.display = 'none';
             currentAlertMachineId = null;
+        }
+        
+        // Machine Modal
+        function showMachineModal(machineId) {
+            const machine = machines.find(m => m.id === machineId);
+            if (!machine) return;
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 class="modal-title">${machine.hostname} - Quick View</h3>
+                            <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="grid grid-2 mb-3">
+                                <div>
+                                    <div class="flex mb-2" style="align-items: center; gap: 0.5rem;">
+                                        <div class="status-dot status-${machine.status}"></div>
+                                        <span class="badge badge-${machine.status === 'online' ? 'success' : 'danger'}">${machine.status.toUpperCase()}</span>
+                                        <span class="text-muted">Last seen: ${new Date(machine.lastSeen).toLocaleString()}</span>
+                                    </div>
+                                    <div><strong>Platform:</strong> ${machine.platform}</div>
+                                    <div><strong>Agent:</strong> v${machine.agentVersion || 'Unknown'}</div>
+                                </div>
+                                <div>
+                                    ${machine.systemInfo?.cpu_count ? `
+                                        <div><strong>CPU:</strong> ${machine.systemInfo.cpu_count} cores</div>
+                                        <div><strong>Memory:</strong> ${formatBytes(machine.systemInfo.memory_total)}</div>
+                                        <div><strong>Disk:</strong> ${formatBytes(machine.systemInfo.disk_total)}</div>
+                                    ` : '<div class="text-muted">System info not available</div>'}
+                                </div>
+                            </div>
+                            
+                            ${machine.metrics?.cpu_percent ? `
+                                <div class="grid grid-3 mb-3">
+                                    <div>
+                                        <div class="text-muted mb-1">CPU Usage</div>
+                                        <div style="font-weight: bold; margin-bottom: 0.5rem;">${machine.metrics.cpu_percent.toFixed(1)}%</div>
+                                        <div class="progress">
+                                            <div class="progress-bar progress-cpu" style="width: ${machine.metrics.cpu_percent}%"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted mb-1">Memory Usage</div>
+                                        <div style="font-weight: bold; margin-bottom: 0.5rem;">${machine.metrics.memory_percent.toFixed(1)}%</div>
+                                        <div class="progress">
+                                            <div class="progress-bar progress-memory" style="width: ${machine.metrics.memory_percent}%"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted mb-1">Disk Usage</div>
+                                        <div style="font-weight: bold; margin-bottom: 0.5rem;">${machine.metrics.disk_percent.toFixed(1)}%</div>
+                                        <div class="progress">
+                                            <div class="progress-bar progress-disk" style="width: ${machine.metrics.disk_percent}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : '<div class="text-muted mb-3">No metrics available</div>'}
+                            
+                            <div class="flex flex-wrap mb-3">
+                                <button onclick="quickAction('${machine.id}', 'processes'); this.closest('.modal').remove();" ${machine.status === 'offline' ? 'disabled' : ''} class="btn btn-info btn-sm">Processes</button>
+                                <button onclick="quickAction('${machine.id}', 'services'); this.closest('.modal').remove();" ${machine.status === 'offline' ? 'disabled' : ''} class="btn btn-success btn-sm">Services</button>
+                                <button onclick="quickAction('${machine.id}', 'reboot'); this.closest('.modal').remove();" ${machine.status === 'offline' ? 'disabled' : ''} class="btn btn-warning btn-sm">Reboot</button>
+                                <button onclick="updateSingleAgent('${machine.id}'); this.closest('.modal').remove();" ${machine.status === 'offline' ? 'disabled' : ''} class="btn btn-warning btn-sm">Update</button>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button onclick="window.location.href='/machine.html?id=${machine.id}'" class="btn btn-primary">View Full Details</button>
+                            <button onclick="this.closest('.modal').remove()" class="btn btn-secondary">Close</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Close on outside click
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.remove();
+            };
         }
 
         function logout() {
