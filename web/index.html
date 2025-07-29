@@ -176,7 +176,7 @@
         let machines = [];
         let groups = {};
         let selectedGroup = 'all';
-        let viewMode = 'cards';
+        let viewMode = 'table';
 
         // Machine management functions
         async function uninstallAgent(machineId) {
@@ -776,7 +776,6 @@
                                     <th>CPU</th>
                                     <th>Memory</th>
                                     <th>Score</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -796,14 +795,8 @@
                                             <td>${machine.platform}</td>
                                             <td>${metrics.cpu_percent ? metrics.cpu_percent.toFixed(1) + '%' : 'N/A'}</td>
                                             <td>${metrics.memory_percent ? metrics.memory_percent.toFixed(1) + '%' : 'N/A'}</td>
-                                            <td><span style="color: ${getScoreColor(calculateOverallScore(machine))}; font-weight: bold;">${calculateOverallScore(machine)}</span></td>
-                                            <td>
-                                                <div class="flex">
-                                                    <button onclick="quickAction('${machine.id}', 'processes')" ${disabled ? 'disabled' : ''} class="btn btn-info btn-sm">Proc</button>
-                                                    <button onclick="quickAction('${machine.id}', 'reboot')" ${disabled ? 'disabled' : ''} class="btn btn-warning btn-sm">Reboot</button>
-                                                    <button onclick="updateSingleAgent('${machine.id}')" ${disabled ? 'disabled' : ''} class="btn btn-success btn-sm">Update</button>
-                                                </div>
-                                            </td>
+                                            <td><span style="color: ${getScoreColor(calculateSystemScore(machine))}; font-weight: bold;">${calculateSystemScore(machine)}</span></td>
+
                                         </tr>
                                     `;
                                 }).join('')}
