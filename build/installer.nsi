@@ -75,6 +75,9 @@ FunctionEnd
 Section "install"
     SetOutPath $INSTDIR
     
+    # Create temp directory for updates
+    CreateDirectory "C:\temp"
+    
     # Copy the agent executable
     File "dist\syswatch-agent-windows.exe"
     

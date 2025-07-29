@@ -60,6 +60,7 @@ def build_windows_agent():
             '--hidden-import=pystray',
             '--hidden-import=PIL',
             '--hidden-import=tkinter',
+            '--hidden-import=psutil',
             '../agents/windows_tray.py'
         ])
         print("Windows tray application built successfully!")

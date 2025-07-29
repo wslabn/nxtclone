@@ -284,21 +284,34 @@ class SysWatchTray:
 
 if __name__ == "__main__":
     try:
-        # Check if another instance is already running
-        import psutil
-        current_pid = os.getpid()
-        for proc in psutil.process_iter(['pid', 'name']):
-            try:
-                if proc.info['name'] == 'syswatch-tray.exe' and proc.info['pid'] != current_pid:
-                    print("Another instance of SysWatch Tray is already running")
-                    sys.exit(0)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
+        # Check if another instance is already running (with fallback)
+        try:
+            import psutil
+            current_pid = os.getpid()
+            for proc in psutil.process_iter(['pid', 'name']):
+                try:
+                    if proc.info['name'] == 'syswatch-tray.exe' and proc.info['pid'] != current_pid:
+                        print("Another instance of SysWatch Tray is already running")
+                        sys.exit(0)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+        except ImportError:
+            print("psutil not available, skipping single-instance check")
+        except Exception as e:
+            print(f"Single-instance check failed: {e}, continuing anyway")
         
         app = SysWatchTray()
         app.run()
     except KeyboardInterrupt:
         sys.exit(0)
     except Exception as e:
+        # Write error to file since GUI apps don't show console
+        try:
+            with open('C:\\temp\\tray_error.log', 'w') as f:
+                f.write(f"Tray application error: {e}\n")
+                import traceback
+                f.write(traceback.format_exc())
+        except:
+            pass
         print(f"Tray application error: {e}")
         sys.exit(1)
