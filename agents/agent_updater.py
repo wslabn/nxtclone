@@ -15,10 +15,13 @@ class AgentUpdater:
         
     def get_current_version(self):
         try:
-            # Try to read version from a version file
-            version_file = Path(__file__).parent / "version.txt"
-            if version_file.exists():
-                return version_file.read_text().strip()
+            # Read version from package.json
+            package_file = Path(__file__).parent / ".." / "package.json"
+            if package_file.exists():
+                import json
+                with open(package_file, 'r') as f:
+                    package_data = json.load(f)
+                    return package_data.get('version', '1.0.0')
             return "1.0.0"
         except:
             return "1.0.0"

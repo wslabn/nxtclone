@@ -116,13 +116,15 @@ class WindowsAgent:
     async def register(self, websocket):
         system_info = self.get_system_info()
         
-        # Read version from file
+        # Read version from package.json
         version = "Unknown"
         try:
-            version_file = os.path.join(os.path.dirname(__file__), "version.txt")
-            if os.path.exists(version_file):
-                with open(version_file, 'r') as f:
-                    version = f.read().strip()
+            package_file = os.path.join(os.path.dirname(__file__), "..", "package.json")
+            if os.path.exists(package_file):
+                with open(package_file, 'r') as f:
+                    import json
+                    package_data = json.load(f)
+                    version = package_data.get('version', 'Unknown')
         except Exception as e:
             print(f"Could not read version: {e}")
         
