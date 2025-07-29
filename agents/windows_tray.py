@@ -35,19 +35,31 @@ class SysWatchTray:
         """Get server URL from running agent process"""
         try:
             import subprocess
-            # Get command line of running agent process
+            # Try PowerShell method first (more reliable)
+            result = subprocess.run([
+                'powershell', '-Command', 
+                'Get-WmiObject Win32_Process | Where-Object {$_.Name -eq "syswatch-agent-windows.exe"} | Select-Object CommandLine'
+            ], capture_output=True, text=True)
+            
+            for line in result.stdout.split('\n'):
+                if 'ws://' in line:
+                    # Extract URL from command line
+                    import re
+                    match = re.search(r'ws://[^\s]+', line)
+                    if match:
+                        return match.group(0)
+            
+            # Fallback to wmic
             result = subprocess.run(['wmic', 'process', 'where', 'name="syswatch-agent-windows.exe"', 
                                    'get', 'commandline', '/format:list'], 
                                   capture_output=True, text=True)
             
             for line in result.stdout.split('\n'):
                 if 'CommandLine=' in line and 'ws://' in line:
-                    # Extract URL from command line
-                    cmd_line = line.split('CommandLine=')[1].strip()
-                    parts = cmd_line.split()
-                    for part in parts:
-                        if part.startswith('ws://'):
-                            return part
+                    import re
+                    match = re.search(r'ws://[^\s]+', line)
+                    if match:
+                        return match.group(0)
             return None
         except:
             return None
