@@ -414,7 +414,7 @@
                         <div class="mb-2"><strong>CPU Cores:</strong> ${info.cpu_count} cores</div>
                         <div class="mb-2"><strong>Memory:</strong> ${formatBytes(info.memory_total)} ${info.memory_type ? `(${info.memory_type})` : ''}</div>
                         <div class="mb-2"><strong>Disk:</strong> ${formatBytes(info.disk_total)}</div>
-                        ${info.disk_drives ? `<div class="mb-2"><strong>Drives:</strong> ${Array.isArray(info.disk_drives) ? info.disk_drives.join(', ') : info.disk_drives}</div>` : ''}
+                        ${info.disk_drives ? `<div class="mb-2"><strong>Drives:</strong><br>${Array.isArray(info.disk_drives) ? info.disk_drives.map(drive => `&nbsp;&nbsp;• ${drive}`).join('<br>') : `&nbsp;&nbsp;• ${info.disk_drives}`}</div>` : ''}
                     </div>
                     <div>
                         <div class="mb-2"><strong>BIOS Version:</strong> ${info.bios_version || 'Unknown'}</div>

@@ -44,6 +44,9 @@ class AgentUpdater:
     
     def check_for_updates(self):
         try:
+            # Refresh current version on each check
+            current_version = self.get_current_version()
+            
             url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/releases/latest"
             headers = {"User-Agent": "syswatch-agent-updater"}
             
@@ -57,8 +60,8 @@ class AgentUpdater:
             download_url = self.get_platform_download_url(release)
             
             return {
-                "has_update": self.compare_versions(latest_version, self.current_version) > 0,
-                "current_version": self.current_version,
+                "has_update": self.compare_versions(latest_version, current_version) > 0,
+                "current_version": current_version,
                 "latest_version": latest_version,
                 "download_url": download_url,
                 "release_notes": release.get("body", "")
@@ -102,16 +105,24 @@ class AgentUpdater:
     
     def download_and_update(self, download_url):
         try:
-            print("Downloading update...")
+            print(f"Downloading update from: {download_url}")
             
             # Check if this is a direct executable download
             if download_url.endswith(('.exe', '-linux')):
-                return self.download_executable_update(download_url)
+                print("Starting executable update process...")
+                result = self.download_executable_update(download_url)
+                print(f"Executable update result: {result}")
+                return result
             else:
-                return self.download_source_update(download_url)
+                print("Starting source update process...")
+                result = self.download_source_update(download_url)
+                print(f"Source update result: {result}")
+                return result
                 
         except Exception as e:
-            print(f"Update failed: {e}")
+            print(f"Update failed with exception: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             return False
     
     def download_executable_update(self, download_url):

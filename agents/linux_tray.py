@@ -105,6 +105,7 @@ class SysWatchLinuxTray:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Change Server", self.change_server_gui),
             pystray.MenuItem("Restart Service", self.restart_service),
+            pystray.MenuItem("Update Agent", self.update_agent),
             pystray.MenuItem("View Logs", self.view_logs),
             pystray.MenuItem("Service Status", self.show_status),
             pystray.Menu.SEPARATOR,
@@ -147,25 +148,28 @@ class SysWatchLinuxTray:
             print("\nOptions:")
             print("1. Change server URL")
             print("2. Restart service")
-            print("3. View logs")
-            print("4. Service status")
-            print("5. About")
-            print("6. Exit")
+            print("3. Update agent")
+            print("4. View logs")
+            print("5. Service status")
+            print("6. About")
+            print("7. Exit")
             
             try:
-                choice = input("\nEnter choice (1-6): ").strip()
+                choice = input("\nEnter choice (1-7): ").strip()
                 
                 if choice == '1':
                     self.change_server_cli()
                 elif choice == '2':
                     self.restart_service()
                 elif choice == '3':
-                    self.view_logs()
+                    self.update_agent()
                 elif choice == '4':
-                    self.show_status()
+                    self.view_logs()
                 elif choice == '5':
-                    self.show_about()
+                    self.show_status()
                 elif choice == '6':
+                    self.show_about()
+                elif choice == '7':
                     break
                 else:
                     print("Invalid choice")
@@ -227,6 +231,33 @@ class SysWatchLinuxTray:
                 
         except Exception as e:
             print(f"Error restarting service: {e}")
+    
+    def update_agent(self):
+        """Update the SysWatch agent"""
+        try:
+            print("Checking for updates...")
+            
+            # Download latest release
+            url = "https://github.com/wslabn/nxtclone/releases/latest/download/syswatch-agent-linux"
+            result = subprocess.run([
+                'wget', '-O', '/tmp/syswatch-update', url
+            ], capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print("Update downloaded, installing...")
+                
+                # Stop service, replace executable, start service
+                subprocess.run(['sudo', 'systemctl', 'stop', 'syswatch-agent'], capture_output=True)
+                subprocess.run(['sudo', 'chmod', '+x', '/tmp/syswatch-update'], capture_output=True)
+                subprocess.run(['sudo', 'cp', '/tmp/syswatch-update', '/opt/syswatch/syswatch-agent-linux'], capture_output=True)
+                subprocess.run(['sudo', 'systemctl', 'start', 'syswatch-agent'], capture_output=True)
+                
+                print("Agent updated successfully")
+            else:
+                print("Update download failed")
+                
+        except Exception as e:
+            print(f"Update failed: {e}")
     
     def view_logs(self):
         """View service logs"""

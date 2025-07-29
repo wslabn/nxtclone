@@ -85,6 +85,7 @@ class SysWatchTray:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Change Server", self.change_server),
             pystray.MenuItem("Restart Agent", self.restart_service),
+            pystray.MenuItem("Update Agent", self.update_agent),
             pystray.MenuItem("View Logs", self.view_logs),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("About", self.show_about),
@@ -158,6 +159,50 @@ class SysWatchTray:
                 self.show_notification(f"Error restarting agent: {str(e)}")
         
         threading.Thread(target=restart, daemon=True).start()
+    
+    def update_agent(self, icon, item):
+        def update():
+            try:
+                self.show_notification("Checking for updates...")
+                
+                # Download latest release
+                url = "https://github.com/wslabn/nxtclone/releases/latest/download/syswatch-agent-windows.exe"
+                response = subprocess.run([
+                    'powershell', '-Command', 
+                    f'Invoke-WebRequest -Uri "{url}" -OutFile "C:\\temp\\syswatch-update.exe"'
+                ], capture_output=True, text=True)
+                
+                if response.returncode == 0:
+                    self.show_notification("Update downloaded, installing...")
+                    
+                    # Stop service, replace executable, start service
+                    subprocess.run(['sc', 'stop', 'SysWatchAgent'], capture_output=True)
+                    import time
+                    time.sleep(3)
+                    
+                    # Find installation directory
+                    install_paths = [
+                        "C:/Program Files/SysWatch/syswatch-agent-windows.exe",
+                        "C:/Program Files (x86)/SysWatch/syswatch-agent-windows.exe"
+                    ]
+                    
+                    for install_path in install_paths:
+                        if Path(install_path).exists():
+                            subprocess.run([
+                                'powershell', '-Command',
+                                f'Copy-Item "C:\\temp\\syswatch-update.exe" "{install_path}" -Force'
+                            ], capture_output=True)
+                            break
+                    
+                    subprocess.run(['sc', 'start', 'SysWatchAgent'], capture_output=True)
+                    self.show_notification("Agent updated successfully")
+                else:
+                    self.show_notification("Update download failed")
+                    
+            except Exception as e:
+                self.show_notification(f"Update failed: {str(e)}")
+        
+        threading.Thread(target=update, daemon=True).start()
     
     def view_logs(self, icon, item):
         def show_logs():

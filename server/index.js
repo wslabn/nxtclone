@@ -691,6 +691,7 @@ class RMMServer {
         global.updateStatuses.set(message.hostname, {
           status: message.status,
           version: message.version,
+          currentVersion: message.currentVersion,
           error: message.error,
           timestamp: Date.now()
         });
@@ -807,8 +808,8 @@ class RMMServer {
     
     const isWindows = client.platform.includes('Windows');
     const versionCommand = isWindows ? 
-      'type "C:\\Program Files\\SysWatch\\version.txt" 2>nul || type "C:\\Program Files (x86)\\SysWatch\\version.txt" 2>nul || echo Unknown' :
-      'cat /opt/syswatch/version.txt 2>/dev/null || echo Unknown';
+      'powershell "try { python -c \"from version import VERSION; print(VERSION)\" } catch { echo Unknown }"' :
+      'python3 -c "try:\n    from version import VERSION\n    print(VERSION)\nexcept:\n    print(\"Unknown\")" 2>/dev/null || echo Unknown';
     
     const commandId = uuidv4();
     client.ws.send(JSON.stringify({
