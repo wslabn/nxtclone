@@ -174,7 +174,8 @@ class LinuxAgent:
                         "type": "update_status",
                         "hostname": self.hostname,
                         "status": "updating",
-                        "version": update_info['latest_version']
+                        "version": update_info['latest_version'],
+                        "currentVersion": update_info['current_version']
                     }))
                     
                     print(f"Auto-updating: {update_info['current_version']} -> {update_info['latest_version']}")

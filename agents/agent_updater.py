@@ -17,13 +17,39 @@ class AgentUpdater:
         try:
             # Read version from package.json
             package_file = Path(__file__).parent / ".." / "package.json"
+            print(f"Looking for package.json at: {package_file}")
+            
             if package_file.exists():
+                print(f"Found package.json, reading version...")
                 import json
                 with open(package_file, 'r') as f:
                     package_data = json.load(f)
-                    return package_data.get('version', '1.0.0')
-            return "1.0.0"
-        except:
+                    version = package_data.get('version', '1.0.0')
+                    print(f"Read version from package.json: {version}")
+                    return version
+            else:
+                print(f"package.json not found at {package_file}")
+                # Fallback: try to find package.json in different locations
+                possible_paths = [
+                    Path(__file__).parent.parent / "package.json",
+                    Path("package.json"),
+                    Path("../package.json")
+                ]
+                
+                for path in possible_paths:
+                    print(f"Trying fallback path: {path}")
+                    if path.exists():
+                        import json
+                        with open(path, 'r') as f:
+                            package_data = json.load(f)
+                            version = package_data.get('version', '1.0.0')
+                            print(f"Found version at {path}: {version}")
+                            return version
+                
+                print("No package.json found in any location")
+                return "1.0.0"
+        except Exception as e:
+            print(f"Error reading version: {e}")
             return "1.0.0"
     
     def check_for_updates(self):
