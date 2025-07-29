@@ -1,10 +1,7 @@
 # DISABLED - Using auto-release.yml instead to prevent duplicate builds
-# name: Build and Release
-# 
-# on:
-#   push:
-#     tags:
-#       - 'v*'
+name: Build and Release (DISABLED)
+
+# No 'on' trigger - workflow will not run
 
 jobs:
   build-windows:

@@ -1,2 +1,4 @@
 # DISABLED - This workflow caused duplicate GitHub Actions runs
-# Use build-and-release.yml for manual releases only
+name: Manual Release (DISABLED)
+
+# No 'on' trigger - workflow will not run
