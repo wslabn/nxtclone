@@ -263,7 +263,9 @@
             try {
                 const response = await fetch('/api/machines');
                 const machines = await response.json();
+                console.log('All machines data:', machines);
                 machine = machines.find(m => m.id === machineId);
+                console.log('Selected machine:', machine);
                 
                 if (!machine) {
                     alert('Machine not found');
@@ -350,6 +352,8 @@
 
         function renderLiveMetrics() {
             const metrics = machine.metrics || {};
+            console.log('Machine detail metrics:', metrics);
+            
             if (!metrics.cpu_percent) {
                 document.getElementById('liveMetrics').innerHTML = '<p class="text-muted">No metrics available</p>';
                 return;

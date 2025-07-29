@@ -27,6 +27,9 @@ class WindowsAgent:
         self.server_url = server_url
         self.client_id = None
         self.hostname = socket.gethostname()
+        
+        # Initialize CPU measurement for more accurate readings
+        psutil.cpu_percent(interval=None)
         # Enhanced Windows version detection with patch level
         if platform.system() == 'Windows':
             try:
@@ -361,16 +364,28 @@ class WindowsAgent:
             return {"error": str(e)}
     
     def get_system_metrics(self):
-        """Get real-time system metrics"""
+        """Get real-time system metrics with improved accuracy"""
         try:
+            # Take multiple CPU samples for better accuracy
+            cpu_samples = []
+            for _ in range(3):
+                cpu_samples.append(psutil.cpu_percent(interval=0.5))
+            
+            # Use median to avoid spikes
+            cpu_percent = sorted(cpu_samples)[1]
+            
+            # Get memory and disk info
             memory = psutil.virtual_memory()
             disk = psutil.disk_usage('C:\\')
             
+            # Force refresh memory stats
+            memory = psutil.virtual_memory()
+            
             return {
-                "cpu_percent": psutil.cpu_percent(interval=1),
-                "memory_percent": memory.percent,
+                "cpu_percent": round(cpu_percent, 1),
+                "memory_percent": round(memory.percent, 1),
                 "memory_used": memory.used,
-                "disk_percent": (disk.used / disk.total) * 100,
+                "disk_percent": round((disk.used / disk.total) * 100, 1),
                 "disk_used": disk.used,
                 "process_count": len(psutil.pids()),
                 "network_io": dict(psutil.net_io_counters()._asdict()) if psutil.net_io_counters() else {},

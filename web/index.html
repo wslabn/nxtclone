@@ -209,6 +209,7 @@
             try {
                 const response = await fetch('/api/machines');
                 machines = await response.json();
+                console.log('Dashboard loaded machines:', machines);
                 renderMachines();
             } catch (error) {
                 console.error('Failed to load machines:', error);
@@ -335,6 +336,7 @@
 
         function renderMetrics(machine) {
             const metrics = machine.metrics || {};
+            console.log(`Dashboard metrics for ${machine.hostname}:`, metrics);
             if (!metrics.cpu_percent) return '<p class="text-muted">No metrics available</p>';
             
             return `
