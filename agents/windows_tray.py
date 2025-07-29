@@ -170,7 +170,7 @@ class SysWatchTray:
                 url = "https://github.com/wslabn/nxtclone/releases/latest/download/syswatch-agent-windows.exe"
                 response = subprocess.run([
                     'powershell', '-Command', 
-                    f'Invoke-WebRequest -Uri "{url}" -OutFile "C:\\temp\\syswatch-update.exe"'
+                    f'New-Item -ItemType Directory -Force -Path "C:\\temp"; Invoke-WebRequest -Uri "{url}" -OutFile "C:\\temp\\syswatch-update.exe"'
                 ], capture_output=True, text=True)
                 
                 if response.returncode == 0:
