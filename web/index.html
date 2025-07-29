@@ -775,7 +775,7 @@
                                     <th>Platform</th>
                                     <th>CPU</th>
                                     <th>Memory</th>
-                                    <th>Disk</th>
+                                    <th>Score</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -796,7 +796,7 @@
                                             <td>${machine.platform}</td>
                                             <td>${metrics.cpu_percent ? metrics.cpu_percent.toFixed(1) + '%' : 'N/A'}</td>
                                             <td>${metrics.memory_percent ? metrics.memory_percent.toFixed(1) + '%' : 'N/A'}</td>
-                                            <td>${metrics.disk_percent ? metrics.disk_percent.toFixed(1) + '%' : 'N/A'}</td>
+                                            <td><span style="color: ${getScoreColor(calculateOverallScore(machine))}; font-weight: bold;">${calculateOverallScore(machine)}</span></td>
                                             <td>
                                                 <div class="flex">
                                                     <button onclick="quickAction('${machine.id}', 'processes')" ${disabled ? 'disabled' : ''} class="btn btn-info btn-sm">Proc</button>
@@ -916,6 +916,99 @@
             currentAlertMachineId = null;
         }
         
+        // System Scoring (0-10 scale)
+        function calculatePerformanceScore(machine) {
+            if (!machine.metrics || machine.status === 'offline') return 0.0;
+            
+            const cpu = Math.max(0, 10 - (machine.metrics.cpu_percent / 10));
+            const memory = Math.max(0, 10 - (machine.metrics.memory_percent / 10));
+            const disk = Math.max(0, 10 - (machine.metrics.disk_percent / 10));
+            
+            return Math.round(((cpu + memory + disk) / 3) * 10) / 10;
+        }
+        
+        function calculateHealthScore(machine) {
+            if (machine.status === 'offline') return 0.0;
+            
+            let score = 5.0; // Base score
+            
+            // Connection stability (last 24h)
+            const hoursOnline = (Date.now() - machine.lastSeen) / (1000 * 60 * 60);
+            if (hoursOnline < 1) score += 2.0;
+            else if (hoursOnline < 6) score += 1.0;
+            else if (hoursOnline > 24) score -= 2.0;
+            
+            // Agent version currency
+            if (machine.agentVersion && machine.agentVersion !== 'Unknown') {
+                const version = parseFloat(machine.agentVersion.replace(/[^0-9.]/g, ''));
+                if (version >= 1.2) score += 1.5;
+                else if (version >= 1.0) score += 0.5;
+            }
+            
+            // Resource balance
+            if (machine.metrics) {
+                const avgUsage = (machine.metrics.cpu_percent + machine.metrics.memory_percent) / 2;
+                if (avgUsage < 30) score += 1.0; // Efficient
+                else if (avgUsage > 80) score -= 1.5; // Overloaded
+            }
+            
+            return Math.max(0, Math.min(10, Math.round(score * 10) / 10));
+        }
+        
+        function calculateOverallScore(machine) {
+            const performance = calculatePerformanceScore(machine);
+            const health = calculateHealthScore(machine);
+            return Math.round(((performance + health) / 2) * 10) / 10;
+        }
+        
+        function getScoreColor(score) {
+            if (score >= 8.0) return 'var(--success)';
+            if (score >= 6.0) return 'var(--warning)';
+            if (score >= 4.0) return 'var(--info)';
+            return 'var(--danger)';
+        }
+        
+        // System Scoring (0-10 scale based on metrics)
+        function calculateSystemScore(machine) {
+            if (!machine.metrics || machine.status === 'offline') return 0.0;
+            
+            const metrics = machine.metrics;
+            let score = 10.0;
+            
+            // CPU Usage (higher usage = lower score)
+            if (metrics.cpu_percent > 90) score -= 3.0;
+            else if (metrics.cpu_percent > 75) score -= 2.0;
+            else if (metrics.cpu_percent > 50) score -= 1.0;
+            else if (metrics.cpu_percent < 10) score -= 0.5; // Too low might indicate issues
+            
+            // Memory Usage (higher usage = lower score)
+            if (metrics.memory_percent > 95) score -= 3.0;
+            else if (metrics.memory_percent > 85) score -= 2.0;
+            else if (metrics.memory_percent > 70) score -= 1.0;
+            
+            // Disk Usage (higher usage = lower score)
+            if (metrics.disk_percent > 95) score -= 2.5;
+            else if (metrics.disk_percent > 85) score -= 1.5;
+            else if (metrics.disk_percent > 75) score -= 0.5;
+            
+            // Process Count (too many processes = lower score)
+            if (metrics.process_count > 200) score -= 1.0;
+            else if (metrics.process_count > 150) score -= 0.5;
+            
+            // Ensure score stays within 0-10 range
+            score = Math.max(0, Math.min(10, score));
+            
+            // Round to 1 decimal place
+            return Math.round(score * 10) / 10;
+        }
+        
+        function getScoreColor(score) {
+            if (score >= 8.0) return 'var(--success)';
+            if (score >= 6.0) return 'var(--warning)';
+            if (score >= 4.0) return 'var(--info)';
+            return 'var(--danger)';
+        }
+        
         // Machine Modal
         function showMachineModal(machineId) {
             const machine = machines.find(m => m.id === machineId);
@@ -932,7 +1025,7 @@
                             <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
                         </div>
                         <div class="modal-body">
-                            <div class="grid grid-2 mb-3">
+                            <div class="grid grid-3 mb-3">
                                 <div>
                                     <div class="flex mb-2" style="align-items: center; gap: 0.5rem;">
                                         <div class="status-dot status-${machine.status}"></div>
@@ -949,9 +1042,20 @@
                                         <div><strong>Disk:</strong> ${formatBytes(machine.systemInfo.disk_total)}</div>
                                     ` : '<div class="text-muted">System info not available</div>'}
                                 </div>
+                                <div>
+                                    <div><strong>Overall Score:</strong> <span style="color: ${getScoreColor(calculateOverallScore(machine))}; font-weight: bold;">${calculateOverallScore(machine)}/10</span></div>
+                                    <div><strong>Performance:</strong> <span style="color: ${getScoreColor(calculatePerformanceScore(machine))}">${calculatePerformanceScore(machine)}/10</span></div>
+                                    <div><strong>Health:</strong> <span style="color: ${getScoreColor(calculateHealthScore(machine))}">${calculateHealthScore(machine)}/10</span></div>
+                                </div>
                             </div>
                             
                             ${machine.metrics?.cpu_percent ? `
+                                <div class="mb-3">
+                                    <div class="flex mb-2" style="align-items: center; justify-content: space-between;">
+                                        <div><strong>System Score:</strong></div>
+                                        <div style="font-size: 1.5rem; font-weight: bold; color: ${getScoreColor(calculateSystemScore(machine))}">${calculateSystemScore(machine)}/10</div>
+                                    </div>
+                                </div>
                                 <div class="grid grid-3 mb-3">
                                     <div>
                                         <div class="text-muted mb-1">CPU Usage</div>
