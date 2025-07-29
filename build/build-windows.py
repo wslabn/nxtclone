@@ -68,6 +68,13 @@ def build_windows_agent():
     
     print("Windows tray application built successfully!")
     
+    # Copy updater script to dist for release
+    try:
+        shutil.copy2('../agents/updater.py', 'dist/updater.py')
+        print("Updater script copied to dist")
+    except Exception as e:
+        print(f"Warning: Could not copy updater script: {e}")
+    
     # Download NSSM
     try:
         import urllib.request

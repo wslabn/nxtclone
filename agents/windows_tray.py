@@ -176,12 +176,8 @@ class SysWatchTray:
                 if response.returncode == 0:
                     self.show_notification("Update downloaded, installing...")
                     
-                    # Stop service, replace executable, start service
-                    subprocess.run(['sc', 'stop', 'SysWatchAgent'], capture_output=True)
-                    import time
-                    time.sleep(3)
-                    
                     # Find installation directory
+                    target_exe = None
                     install_paths = [
                         "C:/Program Files/SysWatch/syswatch-agent-windows.exe",
                         "C:/Program Files (x86)/SysWatch/syswatch-agent-windows.exe"
@@ -189,14 +185,26 @@ class SysWatchTray:
                     
                     for install_path in install_paths:
                         if Path(install_path).exists():
-                            subprocess.run([
-                                'powershell', '-Command',
-                                f'Copy-Item "C:\\temp\\syswatch-update.exe" "{install_path}" -Force'
-                            ], capture_output=True)
+                            target_exe = install_path
                             break
                     
-                    subprocess.run(['sc', 'start', 'SysWatchAgent'], capture_output=True)
-                    self.show_notification("Agent updated successfully")
+                    if target_exe:
+                        # Download and use external updater
+                        updater_url = "https://github.com/wslabn/nxtclone/releases/latest/download/updater.py"
+                        subprocess.run([
+                            'powershell', '-Command',
+                            f'Invoke-WebRequest -Uri "{updater_url}" -OutFile "C:\\temp\\updater.py"'
+                        ], capture_output=True)
+                        
+                        # Launch external updater
+                        subprocess.Popen([
+                            'python', 'C:\\temp\\updater.py', 
+                            'C:\\temp\\syswatch-update.exe', target_exe
+                        ], creationflags=subprocess.CREATE_NO_WINDOW)
+                        
+                        self.show_notification("Update in progress...")
+                    else:
+                        self.show_notification("Installation not found")
                 else:
                     self.show_notification("Update download failed")
                     

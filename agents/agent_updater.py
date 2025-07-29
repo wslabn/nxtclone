@@ -126,58 +126,113 @@ class AgentUpdater:
             return False
     
     def download_executable_update(self, download_url):
-        """Download and replace executable"""
+        """Download and replace executable using external updater"""
         try:
+            current_exe = sys.argv[0]
+            new_exe = current_exe + ".new"
+            
+            # Download new executable
+            print("Downloading new executable...")
             response = requests.get(download_url, stream=True, timeout=30)
             response.raise_for_status()
             
-            current_exe = sys.argv[0]
-            backup_exe = current_exe + ".backup"
-            
-            # Create backup
-            shutil.copy2(current_exe, backup_exe)
-            
-            # Download new executable
-            with open(current_exe + ".new", 'wb') as f:
+            with open(new_exe, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
-            # Make executable (Linux)
-            if not sys.platform.startswith('win'):
-                os.chmod(current_exe + ".new", 0o755)
-            
-            # Replace current executable using batch script for Windows
             if sys.platform.startswith('win'):
-                # Create batch script to replace file after exit
-                batch_script = current_exe + ".update.bat"
-                with open(batch_script, 'w') as f:
-                    f.write('@echo off\n')
-                    f.write('timeout /t 2 /nobreak >nul\n')
-                    f.write(f'move "{current_exe + ".new"}" "{current_exe}"\n')
-                    f.write(f'sc start "SysWatch Agent"\n')
-                    f.write(f'del "{batch_script}"\n')
-                
-                # The batch script will run after we exit
-                print("Update script created, will replace executable after exit")
-                
-                # Update tray app if it exists
-                self.update_tray_app_if_exists()
+                # Windows: Use external updater
+                return self.update_with_external_updater(new_exe, current_exe)
             else:
                 # Linux: direct replace (works fine on Linux)
-                os.rename(current_exe + ".new", current_exe)
-                
-                # Update control app if it exists
+                os.chmod(new_exe, 0o755)
+                os.rename(new_exe, current_exe)
                 self.update_control_app_if_exists()
-            
-            print("Executable updated successfully")
-            return True
+                print("Executable updated successfully")
+                return True
             
         except Exception as e:
             print(f"Executable update failed: {e}")
-            # Restore backup if available
-            if os.path.exists(backup_exe):
-                shutil.copy2(backup_exe, current_exe)
+            # Clean up downloaded file
+            if os.path.exists(new_exe):
+                os.remove(new_exe)
             return False
+    
+    def update_with_external_updater(self, new_exe, current_exe):
+        """Use external updater to replace executable"""
+        try:
+            # Create external updater
+            updater_script = os.path.join(os.path.dirname(current_exe), "updater.py")
+            
+            # Download updater script if it doesn't exist
+            if not os.path.exists(updater_script):
+                print("Downloading updater script...")
+                updater_url = f"https://github.com/{self.repo_owner}/{self.repo_name}/releases/latest/download/updater.py"
+                try:
+                    response = requests.get(updater_url, timeout=10)
+                    response.raise_for_status()
+                    with open(updater_script, 'w') as f:
+                        f.write(response.text)
+                except:
+                    # Fallback: use embedded updater
+                    self.create_embedded_updater(updater_script)
+            
+            # Update tray app if it exists
+            self.update_tray_app_if_exists()
+            
+            # Launch external updater
+            print("Launching external updater...")
+            subprocess.Popen([sys.executable, updater_script, new_exe, current_exe], 
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            # Exit immediately to allow updater to work
+            print("Exiting for external update...")
+            import time
+            time.sleep(1)
+            sys.exit(0)
+            
+        except Exception as e:
+            print(f"External updater failed: {e}")
+            return False
+    
+    def create_embedded_updater(self, updater_path):
+        """Create embedded updater script as fallback"""
+        updater_code = '''#!/usr/bin/env python3
+import sys, os, time, subprocess, shutil
+
+def main():
+    if len(sys.argv) != 3: sys.exit(1)
+    new_exe, target_exe = sys.argv[1], sys.argv[2]
+    
+    # Stop service
+    subprocess.run(['sc', 'stop', 'SysWatchAgent'], capture_output=True)
+    subprocess.run(['taskkill', '/f', '/im', 'syswatch-agent-windows.exe'], capture_output=True)
+    time.sleep(5)
+    
+    # Replace file
+    try:
+        if os.path.exists(target_exe):
+            shutil.copy2(target_exe, target_exe + ".backup")
+        shutil.copy2(new_exe, target_exe)
+        os.remove(new_exe)
+        print("File replacement successful")
+    except Exception as e:
+        print(f"File replacement failed: {e}")
+        sys.exit(1)
+    
+    # Start service
+    subprocess.run(['sc', 'start', 'SysWatchAgent'], capture_output=True)
+    print("Update completed")
+    
+    # Self cleanup
+    time.sleep(2)
+    try: os.remove(__file__)
+    except: pass
+
+if __name__ == "__main__": main()
+'''
+        with open(updater_path, 'w') as f:
+            f.write(updater_code)
     
     def download_source_update(self, download_url):
         """Download and update from source (fallback)"""
@@ -281,21 +336,10 @@ class AgentUpdater:
             return False
     
     def restart_windows_service(self):
-        """Restart Windows service with NSSM failure handling"""
-        service_name = "SysWatchAgent"  # Updated service name
-        
-        # Check if update batch script exists
-        script_path = sys.argv[0] + ".update.bat"
-        if os.path.exists(script_path):
-            print("Running update script with robust restart...")
-            # Create enhanced batch script with NSSM failure handling
-            self.create_robust_update_script(script_path, service_name)
-            subprocess.Popen([script_path], shell=True)
-            print("Enhanced update script started")
-            sys.exit(0)
-        else:
-            # Normal service restart with retry logic
-            return self.restart_service_with_retry(service_name)
+        """Restart Windows service - not used with external updater"""
+        # External updater handles service restart
+        print("Service restart handled by external updater")
+        return True
     
     def create_robust_update_script(self, script_path, service_name):
         """Create enhanced batch script with NSSM failure handling"""
