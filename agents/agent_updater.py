@@ -15,14 +15,13 @@ class AgentUpdater:
         
     def get_current_version(self):
         try:
-            # First try embedded version.txt (for executables)
-            version_file = Path(__file__).parent / "version.txt"
-            print(f"Looking for embedded version.txt at: {version_file}")
-            
-            if version_file.exists():
-                version = version_file.read_text().strip()
-                print(f"Read version from embedded file: {version}")
-                return version
+            # Try to import version from version.py (embedded in executable)
+            try:
+                from version import VERSION
+                print(f"Read version from version.py: {VERSION}")
+                return VERSION
+            except ImportError:
+                print("version.py not found, trying fallback methods")
             
             # Fallback: try package.json (for source installs)
             package_file = Path(__file__).parent / ".." / "package.json"
@@ -37,7 +36,7 @@ class AgentUpdater:
                     print(f"Read version from package.json: {version}")
                     return version
             
-            print("No version file found")
+            print("No version source found")
             return "1.0.0"
         except Exception as e:
             print(f"Error reading version: {e}")

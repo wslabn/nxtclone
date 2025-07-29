@@ -3,21 +3,21 @@ import os
 import shutil
 
 def build_windows_agent():
-    # Read version from package.json and create version file
+    # Read version from package.json and create version.py
     import json
     try:
         with open('../package.json', 'r') as f:
             package_data = json.load(f)
             version = package_data.get('version', '1.0.0')
         
-        # Create temporary version file for embedding
-        with open('temp_version.txt', 'w') as f:
-            f.write(version)
-        print(f"Version {version} will be embedded in executable")
+        # Create version.py file
+        with open('../agents/version.py', 'w') as f:
+            f.write(f'# This file is auto-generated during build\nVERSION = "{version}"\n')
+        print(f"Version {version} embedded in version.py")
     except Exception as e:
         print(f"Error reading version: {e}")
-        with open('temp_version.txt', 'w') as f:
-            f.write('1.0.0')
+        with open('../agents/version.py', 'w') as f:
+            f.write('# This file is auto-generated during build\nVERSION = "1.0.0"\n')
     
     # Create icon first
     try:
@@ -34,7 +34,7 @@ def build_windows_agent():
     PyInstaller.__main__.run([
         '--onefile',
         '--name=syswatch-agent-windows',
-        f'--add-data=temp_version.txt{separator}version.txt',
+        f'--add-data=../agents/version.py{separator}.',
         f'--add-data=../agents/agent_updater.py{separator}.',
         f'--add-data=../agents/windows_agent.py{separator}.',
         '--hidden-import=win32timezone',
@@ -56,7 +56,7 @@ def build_windows_agent():
             '--onefile',
             '--noconsole',
             '--name=syswatch-tray',
-            f'--add-data=temp_version.txt{separator}version.txt',
+            f'--add-data=../agents/version.py{separator}.',
             '--hidden-import=pystray',
             '--hidden-import=PIL',
             '--hidden-import=tkinter',

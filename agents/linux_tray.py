@@ -253,8 +253,12 @@ class SysWatchLinuxTray:
     def show_about(self):
         """Show about information"""
         try:
-            version_file = Path("/opt/syswatch/version.txt")
-            version = version_file.read_text().strip() if version_file.exists() else "Unknown"
+            # Try to import version from version.py (embedded in executable)
+            try:
+                from version import VERSION
+                version = VERSION
+            except ImportError:
+                version = "Unknown"
         except:
             version = "Unknown"
         

@@ -82,15 +82,14 @@ class LinuxAgent:
     async def register(self, websocket):
         system_info = self.get_system_info()
         
-        # Read version from embedded file first, then fallback to package.json
+        # Read version from version.py first, then fallback to package.json
         version = "Unknown"
         try:
-            # Try embedded version.txt first (for executables)
-            version_file = os.path.join(os.path.dirname(__file__), "version.txt")
-            if os.path.exists(version_file):
-                with open(version_file, 'r') as f:
-                    version = f.read().strip()
-            else:
+            # Try to import version from version.py (embedded in executable)
+            try:
+                from version import VERSION
+                version = VERSION
+            except ImportError:
                 # Fallback to package.json (for source installs)
                 package_file = os.path.join(os.path.dirname(__file__), "..", "package.json")
                 if os.path.exists(package_file):
@@ -175,7 +174,9 @@ class LinuxAgent:
                     "status": "checking"
                 }))
                 
+                print("Calling updater.check_for_updates()...")
                 update_info = self.updater.check_for_updates()
+                print(f"Update check result: {update_info}")
                 if update_info.get("has_update"):
                     await websocket.send(json.dumps({
                         "type": "update_status",
@@ -197,12 +198,16 @@ class LinuxAgent:
                     }))
                     print("Agent is already up to date")
             except Exception as e:
-                await websocket.send(json.dumps({
-                    "type": "update_status",
-                    "hostname": self.hostname,
-                    "status": "error",
-                    "error": str(e)
-                }))
+                print(f"Update request handler error: {e}")
+                try:
+                    await websocket.send(json.dumps({
+                        "type": "update_status",
+                        "hostname": self.hostname,
+                        "status": "error",
+                        "error": str(e)
+                    }))
+                except:
+                    pass
                 print(f"Auto-update failed: {e}")
                 
         elif message["type"] == "uninstall_request":
