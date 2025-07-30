@@ -11,8 +11,8 @@
 
 !define INSTALLSIZE 10000
 
-RequestExecutionLevel admin
-InstallDir "$PROGRAMFILES64\SysWatch"
+RequestExecutionLevel user
+InstallDir "$LOCALAPPDATA\SysWatch"
 Name "${APPNAME}"
 Icon "icon.ico"
 outFile "dist\syswatch-agent-installer.exe"
@@ -87,8 +87,9 @@ Section "install"
         # Create desktop shortcut for tray app
         CreateShortCut "$DESKTOP\SysWatch Tray.lnk" "$INSTDIR\syswatch-tray.exe"
         
-        # Create tray config file with server URL
-        FileOpen $4 "$INSTDIR\tray_config.json" w
+        # Create tray config file with server URL in AppData
+        CreateDirectory "$APPDATA\SysWatch"
+        FileOpen $4 "$APPDATA\SysWatch\tray_config.json" w
         FileWrite $4 '{"server_url": "'
         FileWrite $4 $ServerUrl
         FileWrite $4 '"}'

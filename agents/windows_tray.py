@@ -141,7 +141,9 @@ class SysWatchTray:
                     self.show_notification("Service restarted")
                 except:
                     # Find and start executable directly
+                    localappdata = os.path.expandvars("%LOCALAPPDATA%")
                     possible_paths = [
+                        f"{localappdata}/SysWatch/syswatch-agent-windows.exe",
                         "C:/Program Files/SysWatch/syswatch-agent-windows.exe",
                         "C:/Program Files (x86)/SysWatch/syswatch-agent-windows.exe"
                     ]
@@ -171,7 +173,9 @@ class SysWatchTray:
             if messagebox.askyesno("Update Agent", "Check for and install agent updates?"):
                 try:
                     # Find agent executable
+                    localappdata = os.path.expandvars("%LOCALAPPDATA%")
                     agent_paths = [
+                        f"{localappdata}/SysWatch/syswatch-agent-windows.exe",
                         "C:/Program Files/SysWatch/syswatch-agent-windows.exe",
                         "C:/Program Files (x86)/SysWatch/syswatch-agent-windows.exe"
                     ]
