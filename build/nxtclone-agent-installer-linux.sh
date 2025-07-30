@@ -5,18 +5,13 @@
 
 set -e
 
-INSTALL_DIR="/opt/syswatch"
+INSTALL_DIR="$HOME/.local/share/SysWatch"
 SERVICE_NAME="syswatch-agent"
-AGENT_USER="syswatch"
+CONFIG_DIR="$HOME/.config/SysWatch"
 
 echo "SysWatch Agent Installer for Linux"
 echo "=================================="
-
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    echo "Please run as root (use sudo)"
-    exit 1
-fi
+echo "Installing to user directory (no root required)"
 
 # Get server URL
 if [ -z "$1" ]; then
@@ -40,14 +35,10 @@ fi
 echo "Installing SysWatch Agent..."
 echo "Server URL: $SERVER_URL"
 
-# Create user
-if ! id "$AGENT_USER" &>/dev/null; then
-    useradd -r -s /bin/false -d "$INSTALL_DIR" "$AGENT_USER"
-    echo "Created user: $AGENT_USER"
-fi
-
-# Create install directory
+# Create directories
 mkdir -p "$INSTALL_DIR"
+mkdir -p "$CONFIG_DIR"
+mkdir -p "$HOME/.config/systemd/user"
 cd "$INSTALL_DIR"
 
 # Extract embedded agent files (this will be replaced by build script)
@@ -56,19 +47,19 @@ __AGENT_FILES_BASE64__
 AGENT_FILES_END
 
 # Set permissions
-chown -R "$AGENT_USER:$AGENT_USER" "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR/syswatch-agent-linux"
 
 # Install control app if requested
 if [ "$INSTALL_CONTROL" = "y" ] && [ -f "$INSTALL_DIR/syswatch-control" ]; then
     chmod +x "$INSTALL_DIR/syswatch-control"
-    # Create symlink in /usr/local/bin for easy access
-    ln -sf "$INSTALL_DIR/syswatch-control" /usr/local/bin/syswatch-control
-    echo "Control app installed: run 'syswatch-control' from anywhere"
+    # Create symlink in ~/.local/bin for easy access
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$INSTALL_DIR/syswatch-control" "$HOME/.local/bin/syswatch-control"
+    echo "Control app installed: add ~/.local/bin to PATH or run '$HOME/.local/bin/syswatch-control'"
 fi
 
-# Create systemd service
-cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
+# Create user systemd service
+cat > "$HOME/.config/systemd/user/$SERVICE_NAME.service" << EOF
 [Unit]
 Description=SysWatch Agent
 After=network.target
@@ -76,8 +67,6 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=$AGENT_USER
-Group=$AGENT_USER
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/syswatch-agent-linux $SERVER_URL
 Restart=always
@@ -86,19 +75,22 @@ StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 EOF
 
-# Enable and start service
-systemctl daemon-reload
-systemctl enable $SERVICE_NAME
-systemctl start $SERVICE_NAME
+# Enable and start user service
+systemctl --user daemon-reload
+systemctl --user enable $SERVICE_NAME
+systemctl --user start $SERVICE_NAME
+
+# Enable lingering so service starts on boot
+sudo loginctl enable-linger "$USER"
 
 echo ""
 echo "Installation completed successfully!"
 echo "Service: $SERVICE_NAME"
-echo "Status: systemctl status $SERVICE_NAME"
-echo "Logs: journalctl -u $SERVICE_NAME -f"
+echo "Status: systemctl --user status $SERVICE_NAME"
+echo "Logs: journalctl --user -u $SERVICE_NAME -f"
 if [ "$INSTALL_CONTROL" = "y" ] && [ -f "$INSTALL_DIR/syswatch-control" ]; then
     echo "Control app: syswatch-control"
 fi

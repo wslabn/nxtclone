@@ -160,50 +160,53 @@ class AgentUpdater:
             return False
     
     def update_with_external_updater(self, new_exe, current_exe):
-        """Use scheduled task with admin privileges for update"""
+        """Simple file replacement - no admin needed in LOCALAPPDATA"""
         try:
-            # Ensure temp directory exists
-            if not os.path.exists("C:\\temp"):
-                os.makedirs("C:\\temp")
-            
-            # Create updater script in temp
-            updater_script = "C:\\temp\\updater.py"
-            self.create_embedded_updater(updater_script)
-            
             # Update tray app if it exists
             self.update_tray_app_if_exists()
             
             # Create log file
             log_file = "C:\\temp\\syswatch_update.log"
             with open(log_file, 'w') as f:
-                f.write(f"Starting scheduled task update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Starting simple update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"New exe: {new_exe}\n")
                 f.write(f"Current exe: {current_exe}\n")
             
-            # Create/update scheduled task for updates
-            task_name = "SysWatchAgentUpdate"
-            self.create_update_task(task_name, updater_script, new_exe, current_exe)
+            print("Performing direct file replacement...")
             
-            # Trigger the scheduled task
-            print("Triggering scheduled task for update...")
-            result = subprocess.run(['schtasks', '/run', '/tn', task_name], 
-                                  capture_output=True, text=True)
+            # Stop service
+            subprocess.run(['sc', 'stop', 'SysWatch Agent'], capture_output=True)
+            subprocess.run(['taskkill', '/f', '/im', 'syswatch-agent-windows.exe'], capture_output=True)
+            time.sleep(3)
+            
+            # Backup current file
+            if os.path.exists(current_exe):
+                shutil.copy2(current_exe, current_exe + ".backup")
+                with open(log_file, 'a') as f:
+                    f.write("Created backup file\n")
+            
+            # Replace with new file
+            shutil.copy2(new_exe, current_exe)
+            os.remove(new_exe)
             
             with open(log_file, 'a') as f:
-                f.write(f"Task trigger result: {result.returncode}\n")
-                if result.stdout: f.write(f"Output: {result.stdout}\n")
-                if result.stderr: f.write(f"Error: {result.stderr}\n")
+                f.write("File replacement completed\n")
             
-            if result.returncode == 0:
-                print("Scheduled task triggered successfully, exiting agent...")
-                time.sleep(2)
-                os._exit(0)
-            else:
-                print(f"Failed to trigger scheduled task: {result.stderr}")
-                return False
+            # Start service
+            time.sleep(2)
+            subprocess.run(['sc', 'start', 'SysWatch Agent'], capture_output=True)
+            
+            with open(log_file, 'a') as f:
+                f.write("Service restarted\n")
+                f.write("Update completed successfully\n")
+            
+            print("Update completed successfully")
+            return True
             
         except Exception as e:
-            print(f"Scheduled task update failed: {e}")
+            with open(log_file, 'a') as f:
+                f.write(f"Update failed: {e}\n")
+            print(f"Update failed: {e}")
             return False
     
     def create_embedded_updater(self, updater_path):
@@ -542,19 +545,19 @@ if __name__ == "__main__": main()
             return False
     
     def restart_linux_service(self):
-        """Restart Linux service with retry logic"""
+        """Restart Linux user service with retry logic"""
         try:
-            result = subprocess.run(['sudo', 'systemctl', 'restart', 'syswatch-agent'], 
+            result = subprocess.run(['systemctl', '--user', 'restart', 'syswatch-agent'], 
                                   capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0:
-                print("Linux service restarted successfully")
+                print("Linux user service restarted successfully")
                 return True
             else:
-                print(f"Linux service restart failed: {result.stderr}")
+                print(f"Linux user service restart failed: {result.stderr}")
                 return False
         except Exception as e:
-            print(f"Linux service restart failed: {e}")
+            print(f"Linux user service restart failed: {e}")
             return False
     
     def create_update_task(self, task_name, updater_script, new_exe, current_exe):

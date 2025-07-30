@@ -8,7 +8,9 @@ from pathlib import Path
 
 class SysWatchLinuxTray:
     def __init__(self):
-        self.config_file = Path("/opt/syswatch/tray_config.json")
+        config_dir = Path.home() / ".config" / "SysWatch"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        self.config_file = config_dir / "tray_config.json"
         self.load_config()
         
         # Try GUI first, fallback to CLI
@@ -221,7 +223,7 @@ class SysWatchLinuxTray:
         """Restart the SysWatch service"""
         try:
             print("Restarting SysWatch service...")
-            result = subprocess.run(['sudo', 'systemctl', 'restart', 'syswatch-agent'], 
+            result = subprocess.run(['systemctl', '--user', 'restart', 'syswatch-agent'], 
                                   capture_output=True, text=True)
             
             if result.returncode == 0:
@@ -247,10 +249,11 @@ class SysWatchLinuxTray:
                 print("Update downloaded, installing...")
                 
                 # Stop service, replace executable, start service
-                subprocess.run(['sudo', 'systemctl', 'stop', 'syswatch-agent'], capture_output=True)
-                subprocess.run(['sudo', 'chmod', '+x', '/tmp/syswatch-update'], capture_output=True)
-                subprocess.run(['sudo', 'cp', '/tmp/syswatch-update', '/opt/syswatch/syswatch-agent-linux'], capture_output=True)
-                subprocess.run(['sudo', 'systemctl', 'start', 'syswatch-agent'], capture_output=True)
+                install_dir = Path.home() / ".local" / "share" / "SysWatch"
+                subprocess.run(['systemctl', '--user', 'stop', 'syswatch-agent'], capture_output=True)
+                subprocess.run(['chmod', '+x', '/tmp/syswatch-update'], capture_output=True)
+                subprocess.run(['cp', '/tmp/syswatch-update', str(install_dir / 'syswatch-agent-linux')], capture_output=True)
+                subprocess.run(['systemctl', '--user', 'start', 'syswatch-agent'], capture_output=True)
                 
                 print("Agent updated successfully")
             else:
@@ -263,7 +266,7 @@ class SysWatchLinuxTray:
         """View service logs"""
         try:
             print("Opening logs...")
-            subprocess.run(['journalctl', '-u', 'syswatch-agent', '-f'])
+            subprocess.run(['journalctl', '--user', '-u', 'syswatch-agent', '-f'])
         except KeyboardInterrupt:
             pass
         except Exception as e:
@@ -272,7 +275,7 @@ class SysWatchLinuxTray:
     def show_status(self):
         """Show service status"""
         try:
-            result = subprocess.run(['systemctl', 'status', 'syswatch-agent'], 
+            result = subprocess.run(['systemctl', '--user', 'status', 'syswatch-agent'], 
                                   capture_output=True, text=True)
             print("\nService Status:")
             print("-" * 20)
@@ -297,8 +300,8 @@ class SysWatchLinuxTray:
 SysWatch Agent v{version}
 
 Server: {self.server_url}
-Install Path: /opt/syswatch/
-Service: syswatch-agent
+Install Path: ~/.local/share/SysWatch/
+Service: syswatch-agent (user service)
 
 Remote monitoring and management system
 © 2025 SysWatch
