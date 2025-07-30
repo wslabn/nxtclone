@@ -190,19 +190,22 @@ class AgentUpdater:
                 f.write(f"Starting update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}\n")
             
-            # Launch updater with output redirection
+            # Launch updater with proper detachment
             with open(log_file, 'a') as f:
                 process = subprocess.Popen([sys.executable, updater_script, new_exe, current_exe], 
-                                         stdout=f, stderr=f, creationflags=subprocess.CREATE_NO_WINDOW)
+                                         stdout=f, stderr=f, 
+                                         creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
             
             print(f"Updater launched with PID: {process.pid}")
             print(f"Update log: {log_file}")
             
-            # Exit immediately to allow updater to work
+            # Wait a moment then exit to allow updater to work
             print("Exiting for external update...")
             import time
-            time.sleep(1)
-            sys.exit(0)
+            time.sleep(3)
+            
+            # Force exit the current process
+            os._exit(0)
             
         except Exception as e:
             print(f"External updater failed: {e}")
