@@ -22,7 +22,10 @@ except ImportError:
 
 class SysWatchTray:
     def __init__(self):
-        self.config_file = Path(__file__).parent / "tray_config.json"
+        # Use AppData for config to avoid permission issues
+        appdata_dir = Path(os.path.expandvars("%APPDATA%")) / "SysWatch"
+        appdata_dir.mkdir(exist_ok=True)
+        self.config_file = appdata_dir / "tray_config.json"
         self.load_config()
         
         if TRAY_AVAILABLE:
