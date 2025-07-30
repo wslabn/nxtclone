@@ -556,6 +556,22 @@
                 'winupdates': {
                     'Windows': 'powershell "$Session = New-Object -ComObject Microsoft.Update.Session; $Searcher = $Session.CreateUpdateSearcher(); $SearchResult = $Searcher.Search(\\"IsInstalled=0\\"); if($SearchResult.Updates.Count -eq 0) { Write-Output \\"No updates available\\" } else { $SearchResult.Updates | Select-Object Title, Description, @{Name=\\"Size\\";Expression={[math]::Round($_.MaxDownloadSize/1MB,2)}} | Format-Table -AutoSize }"',
                     'Linux': 'echo "Windows Updates not available on Linux"'
+                },
+                'topcpu': {
+                    'Windows': 'powershell "Get-Process | Sort-Object CPU -Descending | Select-Object -First 10 Name, CPU, @{Name=\\"Memory(MB)\\";Expression={[math]::Round($_.WorkingSet/1MB,1)}} | Format-Table -AutoSize"',
+                    'Linux': 'ps aux --sort=-%cpu | head -10'
+                },
+                'topmem': {
+                    'Windows': 'powershell "Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 10 Name, @{Name=\\"Memory(MB)\\";Expression={[math]::Round($_.WorkingSet/1MB,1)}}, CPU | Format-Table -AutoSize"',
+                    'Linux': 'ps aux --sort=-%mem | head -10'
+                },
+                'topvmem': {
+                    'Windows': 'powershell "Get-Process | Sort-Object VirtualMemorySize -Descending | Select-Object -First 10 Name, @{Name=\\"VirtMem(MB)\\";Expression={[math]::Round($_.VirtualMemorySize/1MB,1)}}, @{Name=\\"PhysMem(MB)\\";Expression={[math]::Round($_.WorkingSet/1MB,1)}} | Format-Table -AutoSize"',
+                    'Linux': 'ps aux --sort=-vsz | head -10'
+                },
+                'topio': {
+                    'Windows': 'powershell "Get-Counter \\"\\Process(*)\\IO Data Bytes/sec\\" | Select-Object -ExpandProperty CounterSamples | Sort-Object CookedValue -Descending | Select-Object -First 10 InstanceName, @{Name=\\"IO(KB/s)\\";Expression={[math]::Round($_.CookedValue/1KB,1)}} | Format-Table -AutoSize"',
+                    'Linux': 'iotop -b -n1 -o | head -10'
                 }
             };
             

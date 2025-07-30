@@ -79,7 +79,6 @@ class SysWatchTray:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Change Server", self.change_server),
             pystray.MenuItem("Restart Agent", self.restart_service),
-            pystray.MenuItem("Update Agent", self.update_agent),
             pystray.MenuItem("View Status", self.view_status),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Exit", self.quit_app)
@@ -147,31 +146,6 @@ class SysWatchTray:
                 self.show_notification(f"Error: {str(e)}")
         
         threading.Thread(target=restart, daemon=True).start()
-    
-    def update_agent(self, icon, item):
-        if not GUI_AVAILABLE:
-            return
-            
-        def update():
-            root = tk.Tk()
-            root.withdraw()
-            
-            if messagebox.askyesno("Update Agent", "Check for and install agent updates?"):
-                try:
-                    # Run updater
-                    updater_path = Path(__file__).parent / "updater.py"
-                    if updater_path.exists():
-                        subprocess.Popen([sys.executable, str(updater_path)], 
-                                       creationflags=subprocess.CREATE_NO_WINDOW)
-                        messagebox.showinfo("Update", "Update check started. Agent will restart if update is available.")
-                    else:
-                        messagebox.showerror("Error", "Updater not found")
-                except Exception as e:
-                    messagebox.showerror("Error", f"Update failed: {str(e)}")
-            
-            root.destroy()
-        
-        threading.Thread(target=update, daemon=True).start()
     
     def view_status(self, icon, item):
         if not GUI_AVAILABLE:

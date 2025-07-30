@@ -383,6 +383,19 @@
                         </div>
                     </div>
                     
+                    <!-- Performance Actions -->
+                    <div class="dropdown" style="position: relative; margin-right: 0.5rem;">
+                        <button class="btn btn-warning btn-sm dropdown-toggle" ${disabled ? 'disabled' : ''} onclick="toggleDropdown('perf-dropdown')">
+                            Performance ▼
+                        </button>
+                        <div id="perf-dropdown" class="dropdown-menu" style="display: none;">
+                            <button onclick="quickAction('topcpu'); closeDropdowns()" class="dropdown-item">Top CPU</button>
+                            <button onclick="quickAction('topmem'); closeDropdowns()" class="dropdown-item">Top RAM</button>
+                            <button onclick="quickAction('topvmem'); closeDropdowns()" class="dropdown-item">Top VMEM</button>
+                            <button onclick="quickAction('topio'); closeDropdowns()" class="dropdown-item">Top I/O</button>
+                        </div>
+                    </div>
+                    
                     <!-- Maintenance Actions -->
                     <div class="dropdown" style="position: relative;">
                         <button class="btn btn-warning btn-sm dropdown-toggle" onclick="toggleDropdown('maintenance-dropdown')">
@@ -631,6 +644,22 @@
                 'network': {
                     'Windows': 'ipconfig /all && netstat -an | findstr LISTEN',
                     'Linux': 'ip addr show && ss -tuln'
+                },
+                'topcpu': {
+                    'Windows': 'powershell "Get-Process | Sort-Object CPU -Descending | Select-Object -First 10 Name, CPU, @{Name=\"Memory(MB)\";Expression={[math]::Round($_.WorkingSet/1MB,1)}} | Format-Table -AutoSize"',
+                    'Linux': 'ps aux --sort=-%cpu | head -10'
+                },
+                'topmem': {
+                    'Windows': 'powershell "Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 10 Name, @{Name=\"Memory(MB)\";Expression={[math]::Round($_.WorkingSet/1MB,1)}}, CPU | Format-Table -AutoSize"',
+                    'Linux': 'ps aux --sort=-%mem | head -10'
+                },
+                'topvmem': {
+                    'Windows': 'powershell "Get-Process | Sort-Object VirtualMemorySize -Descending | Select-Object -First 10 Name, @{Name=\"VirtMem(MB)\";Expression={[math]::Round($_.VirtualMemorySize/1MB,1)}}, @{Name=\"PhysMem(MB)\";Expression={[math]::Round($_.WorkingSet/1MB,1)}} | Format-Table -AutoSize"',
+                    'Linux': 'ps aux --sort=-vsz | head -10'
+                },
+                'topio': {
+                    'Windows': 'powershell "Get-Counter \"\\Process(*)\\IO Data Bytes/sec\" | Select-Object -ExpandProperty CounterSamples | Sort-Object CookedValue -Descending | Select-Object -First 10 InstanceName, @{Name=\"IO(KB/s)\";Expression={[math]::Round($_.CookedValue/1KB,1)}} | Format-Table -AutoSize"',
+                    'Linux': 'iotop -b -n1 -o | head -10'
                 },
                 'systemdetails': {
                     'Windows': 'wmic computersystem get model,manufacturer && wmic cpu get name && wmic bios get smbiosbiosversion && wmic memorychip get memorytype,speed',
