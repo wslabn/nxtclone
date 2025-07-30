@@ -78,7 +78,7 @@ def main():
     
     new_exe = sys.argv[1]
     target_exe = sys.argv[2]
-    service_name = "SysWatchAgent"
+    service_name = "SysWatch Agent"
     process_name = "syswatch-agent-windows.exe"
     
     # Ensure temp directory exists

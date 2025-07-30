@@ -1,6 +1,6 @@
 {
   "name": "syswatch",
-  "version": "1.2.61",
+  "version": "1.2.62",
   "description": "SysWatch - Remote monitoring and management system",
   "main": "server/index.js",
   "scripts": {
