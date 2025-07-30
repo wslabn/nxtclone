@@ -3,7 +3,6 @@ import sys
 import os
 import time
 import subprocess
-import requests
 import shutil
 from pathlib import Path
 
