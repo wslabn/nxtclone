@@ -162,8 +162,10 @@ class AgentUpdater:
     def update_with_external_updater(self, new_exe, current_exe):
         """Use external updater to replace executable"""
         try:
-            # Create external updater
-            updater_script = os.path.join(os.path.dirname(current_exe), "updater.py")
+            # Create external updater in temp directory
+            if not os.path.exists("C:\\temp"):
+                os.makedirs("C:\\temp")
+            updater_script = "C:\\temp\\updater.py"
             
             # Download updater script if it doesn't exist
             if not os.path.exists(updater_script):
@@ -228,6 +230,11 @@ def main():
     if not os.path.exists("C:\\temp"):
         os.makedirs("C:\\temp")
     
+    # Log to temp directory
+    log_file = "C:\\temp\\updater.log"
+    with open(log_file, "w") as f:
+        f.write(f"Starting update: {time.strftime('%Y-%m-%d %H:%M:%S')}\\n")
+    
     # Stop service
     subprocess.run(['sc', 'stop', 'SysWatch Agent'], capture_output=True)
     subprocess.run(['taskkill', '/f', '/im', 'syswatch-agent-windows.exe'], capture_output=True)
@@ -239,14 +246,17 @@ def main():
             shutil.copy2(target_exe, target_exe + ".backup")
         shutil.copy2(new_exe, target_exe)
         os.remove(new_exe)
-        print("File replacement successful")
+        with open(log_file, "a") as f:
+            f.write("File replacement successful\\n")
     except Exception as e:
-        print(f"File replacement failed: {e}")
+        with open(log_file, "a") as f:
+            f.write(f"File replacement failed: {e}\\n")
         sys.exit(1)
     
     # Start service
     subprocess.run(['sc', 'start', 'SysWatch Agent'], capture_output=True)
-    print("Update completed")
+    with open(log_file, "a") as f:
+        f.write("Update completed\\n")
     
     # Self cleanup
     time.sleep(2)
