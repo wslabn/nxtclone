@@ -193,13 +193,13 @@ class AgentUpdater:
                 f.write(f"Starting update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}\n")
             
-            # Create a batch script to run updater after agent exits
+            # Create a batch script to run updater with service context
             batch_script = "C:\\temp\\run_update.bat"
             with open(batch_script, 'w') as f:
                 f.write('@echo off\n')
-                f.write('echo Starting SysWatch Agent Update...\n')
-                f.write('timeout /t 5 /nobreak >nul\n')
-                f.write(f'python "{updater_script}" "{new_exe}" "{current_exe}" > "{log_file}" 2>&1\n')
+                f.write('echo Starting SysWatch Agent Service Update...\n')
+                f.write('timeout /t 3 /nobreak >nul\n')
+                f.write(f'python "{updater_script}" "{new_exe}" "{current_exe}" >> "{log_file}" 2>&1\n')
                 f.write(f'del "{batch_script}" >nul 2>&1\n')
             
             print(f"Created update batch script: {batch_script}")
@@ -233,34 +233,46 @@ def main():
     # Log to temp directory
     log_file = "C:\\temp\\updater.log"
     with open(log_file, "w") as f:
-        f.write(f"Starting update: {time.strftime('%Y-%m-%d %H:%M:%S')}\\n")
+        f.write(f"Starting service-based update: {time.strftime('%Y-%m-%d %H:%M:%S')}\\n")
     
-    # Stop service
+    # Create batch script for service to execute
+    service_script = "C:\\temp\\service_update.bat"
+    with open(service_script, "w") as f:
+        f.write("@echo off\\n")
+        f.write("echo Service update starting...\\n")
+        f.write(f"copy \"{new_exe}\" \"{target_exe}.new\" >nul 2>&1\\n")
+        f.write(f"if exist \"{target_exe}\" move \"{target_exe}\" \"{target_exe}.backup\" >nul 2>&1\\n")
+        f.write(f"move \"{target_exe}.new\" \"{target_exe}\" >nul 2>&1\\n")
+        f.write(f"del \"{new_exe}\" >nul 2>&1\\n")
+        f.write("echo File replacement completed\\n")
+    
+    # Stop service and let it handle file replacement
+    with open(log_file, "a") as f:
+        f.write("Stopping service for update...\\n")
+    
+    # Use sc to stop service and run update script
     subprocess.run(['sc', 'stop', 'SysWatch Agent'], capture_output=True)
-    subprocess.run(['taskkill', '/f', '/im', 'syswatch-agent-windows.exe'], capture_output=True)
-    time.sleep(5)
+    time.sleep(3)
     
-    # Replace file
-    try:
-        if os.path.exists(target_exe):
-            shutil.copy2(target_exe, target_exe + ".backup")
-        shutil.copy2(new_exe, target_exe)
-        os.remove(new_exe)
-        with open(log_file, "a") as f:
-            f.write("File replacement successful\\n")
-    except Exception as e:
-        with open(log_file, "a") as f:
-            f.write(f"File replacement failed: {e}\\n")
-        sys.exit(1)
+    # Execute file replacement as system
+    result = subprocess.run([service_script], capture_output=True, text=True, shell=True)
+    
+    with open(log_file, "a") as f:
+        f.write(f"Update script result: {result.returncode}\\n")
+        if result.stdout: f.write(f"Output: {result.stdout}\\n")
+        if result.stderr: f.write(f"Error: {result.stderr}\\n")
     
     # Start service
-    subprocess.run(['sc', 'start', 'SysWatch Agent'], capture_output=True)
-    with open(log_file, "a") as f:
-        f.write("Update completed\\n")
-    
-    # Self cleanup
     time.sleep(2)
-    try: os.remove(__file__)
+    subprocess.run(['sc', 'start', 'SysWatch Agent'], capture_output=True)
+    
+    with open(log_file, "a") as f:
+        f.write("Service restart completed\\n")
+    
+    # Cleanup
+    try: 
+        os.remove(service_script)
+        os.remove(__file__)
     except: pass
 
 if __name__ == "__main__": main()
