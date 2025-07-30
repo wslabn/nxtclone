@@ -186,13 +186,13 @@ class AgentUpdater:
             print(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}")
             
             # Create log file for updater output
-            log_file = os.path.join(os.path.dirname(current_exe), "update.log")
+            log_file = "C:\\temp\\syswatch_update.log"
             with open(log_file, 'w') as f:
                 f.write(f"Starting update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}\n")
             
             # Create a batch script to run updater after agent exits
-            batch_script = os.path.join(os.path.dirname(current_exe), "run_update.bat")
+            batch_script = "C:\\temp\\run_update.bat"
             with open(batch_script, 'w') as f:
                 f.write('@echo off\n')
                 f.write('echo Starting SysWatch Agent Update...\n')
