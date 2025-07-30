@@ -48,10 +48,19 @@ class SysWatchTray:
     
     def get_agent_server_url(self):
         try:
-            result = subprocess.run(['wmic', 'process', 'where', 'name="syswatch-agent-windows.exe"', 
-                                   'get', 'commandline', '/format:list'], capture_output=True, text=True)
+            # Try PowerShell method first
+            result = subprocess.run(['powershell', '-Command', 
+                                   'Get-WmiObject Win32_Process | Where-Object {$_.Name -eq "syswatch-agent-windows.exe"} | Select-Object CommandLine'], 
+                                   capture_output=True, text=True)
             
             import re
+            match = re.search(r'ws://[^\s"]+', result.stdout)
+            if match:
+                return match.group(0)
+            
+            # Fallback to tasklist method
+            result = subprocess.run(['wmic', 'process', 'where', 'name="syswatch-agent-windows.exe"', 
+                                   'get', 'commandline', '/format:list'], capture_output=True, text=True)
             match = re.search(r'ws://[^\s"]+', result.stdout)
             if match:
                 return match.group(0)
@@ -222,12 +231,25 @@ class SysWatchTray:
             root = tk.Tk()
             root.withdraw()
             
-            # Get version
+            # Get version from multiple sources
+            version = "Unknown"
             try:
+                # Try to import from version.py (if embedded)
                 from version import VERSION
                 version = f"v{VERSION}"
             except ImportError:
-                version = "Unknown"
+                try:
+                    # Try to read from agent directory
+                    version_file = Path(__file__).parent / "version.py"
+                    if version_file.exists():
+                        with open(version_file, 'r') as f:
+                            content = f.read()
+                            import re
+                            match = re.search(r'VERSION = "([^"]+)"', content)
+                            if match:
+                                version = f"v{match.group(1)}"
+                except:
+                    pass
             
             messagebox.showinfo("About SysWatch", 
                 f"SysWatch Agent Tray {version}\n\n"

@@ -6,6 +6,7 @@ import tempfile
 import zipfile
 import shutil
 import json
+import time
 from pathlib import Path
 
 class AgentUpdater:
@@ -190,21 +191,24 @@ class AgentUpdater:
                 f.write(f"Starting update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}\n")
             
-            # Launch updater with proper detachment
-            with open(log_file, 'a') as f:
-                process = subprocess.Popen([sys.executable, updater_script, new_exe, current_exe], 
-                                         stdout=f, stderr=f, 
-                                         creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
+            # Create a batch script to run updater after agent exits
+            batch_script = os.path.join(os.path.dirname(current_exe), "run_update.bat")
+            with open(batch_script, 'w') as f:
+                f.write('@echo off\n')
+                f.write('echo Starting SysWatch Agent Update...\n')
+                f.write('timeout /t 5 /nobreak >nul\n')
+                f.write(f'python "{updater_script}" "{new_exe}" "{current_exe}" > "{log_file}" 2>&1\n')
+                f.write(f'del "{batch_script}" >nul 2>&1\n')
             
-            print(f"Updater launched with PID: {process.pid}")
-            print(f"Update log: {log_file}")
+            print(f"Created update batch script: {batch_script}")
+            print(f"Update log will be: {log_file}")
             
-            # Wait a moment then exit to allow updater to work
-            print("Exiting for external update...")
+            # Launch batch script and exit immediately
+            subprocess.Popen([batch_script], shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            print("Update batch script launched, exiting agent...")
             import time
-            time.sleep(3)
-            
-            # Force exit the current process
+            time.sleep(1)
             os._exit(0)
             
         except Exception as e:

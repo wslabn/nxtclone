@@ -125,15 +125,17 @@ def main():
     time.sleep(2)
     try:
         # Schedule self-deletion
+        updater_path = os.path.abspath(__file__)
         batch_script = "C:\\temp\\cleanup.bat"
         with open(batch_script, 'w') as f:
             f.write('@echo off\n')
             f.write('timeout /t 3 /nobreak >nul\n')
-            f.write(f'del "{__file__}" >nul 2>&1\n')
+            f.write(f'del "{updater_path}" >nul 2>&1\n')
             f.write(f'del "{batch_script}" >nul 2>&1\n')
         
-        subprocess.Popen([batch_script], shell=True)
-    except:
+        subprocess.Popen([batch_script], shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    except Exception as e:
+        print(f"Cleanup script creation failed: {e}")
         pass
 
 if __name__ == "__main__":
