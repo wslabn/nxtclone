@@ -109,6 +109,7 @@ jobs:
       run: |
         mkdir -p final-releases
         find releases/ -name "*" -type f -exec cp {} final-releases/ \;
+        cp agents/updater.py final-releases/
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
