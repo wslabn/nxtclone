@@ -182,8 +182,21 @@ class AgentUpdater:
             
             # Launch external updater
             print("Launching external updater...")
-            subprocess.Popen([sys.executable, updater_script, new_exe, current_exe], 
-                           creationflags=subprocess.CREATE_NO_WINDOW)
+            print(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}")
+            
+            # Create log file for updater output
+            log_file = os.path.join(os.path.dirname(current_exe), "update.log")
+            with open(log_file, 'w') as f:
+                f.write(f"Starting update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}\n")
+            
+            # Launch updater with output redirection
+            with open(log_file, 'a') as f:
+                process = subprocess.Popen([sys.executable, updater_script, new_exe, current_exe], 
+                                         stdout=f, stderr=f, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            print(f"Updater launched with PID: {process.pid}")
+            print(f"Update log: {log_file}")
             
             # Exit immediately to allow updater to work
             print("Exiting for external update...")
@@ -209,7 +222,7 @@ def main():
         os.makedirs("C:\\temp")
     
     # Stop service
-    subprocess.run(['sc', 'stop', 'SysWatchAgent'], capture_output=True)
+    subprocess.run(['sc', 'stop', 'SysWatch Agent'], capture_output=True)
     subprocess.run(['taskkill', '/f', '/im', 'syswatch-agent-windows.exe'], capture_output=True)
     time.sleep(5)
     
@@ -225,7 +238,7 @@ def main():
         sys.exit(1)
     
     # Start service
-    subprocess.run(['sc', 'start', 'SysWatchAgent'], capture_output=True)
+    subprocess.run(['sc', 'start', 'SysWatch Agent'], capture_output=True)
     print("Update completed")
     
     # Self cleanup
@@ -295,9 +308,19 @@ if __name__ == "__main__": main()
                 with open(tray_path + ".new", 'wb') as f:
                     f.write(response.content)
                 
+                # Kill existing tray processes
+                subprocess.run(['taskkill', '/f', '/im', 'syswatch-tray.exe'], 
+                             capture_output=True, check=False)
+                
                 os.rename(tray_path, tray_path + ".old")
                 os.rename(tray_path + ".new", tray_path)
                 print("Tray application updated successfully")
+                
+                # Restart tray app after a delay
+                import time
+                time.sleep(2)
+                subprocess.Popen([tray_path], creationflags=subprocess.CREATE_NO_WINDOW)
+                print("Tray application restarted")
         except Exception as e:
             print(f"Tray app update failed: {e}")
     

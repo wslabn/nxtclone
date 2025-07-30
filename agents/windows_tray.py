@@ -158,14 +158,29 @@ class SysWatchTray:
             
             if messagebox.askyesno("Update Agent", "Check for and install agent updates?"):
                 try:
-                    # Run updater
-                    updater_path = Path(__file__).parent / "updater.py"
-                    if updater_path.exists():
-                        subprocess.Popen([sys.executable, str(updater_path)], 
+                    # Find agent executable
+                    agent_paths = [
+                        "C:/Program Files/SysWatch/syswatch-agent-windows.exe",
+                        "C:/Program Files (x86)/SysWatch/syswatch-agent-windows.exe"
+                    ]
+                    
+                    agent_path = None
+                    for path in agent_paths:
+                        if Path(path).exists():
+                            agent_path = path
+                            break
+                    
+                    if agent_path:
+                        # Trigger agent update (agent handles its own update process)
+                        subprocess.Popen([agent_path, "--check-update"], 
                                        creationflags=subprocess.CREATE_NO_WINDOW)
-                        messagebox.showinfo("Update", "Update check started. Agent will restart if update is available.")
+                        messagebox.showinfo("Update", "Update check started. Agent and tray will restart if update is available.")
+                        
+                        # Exit tray to allow update
+                        root.destroy()
+                        self.quit_app(icon, item)
                     else:
-                        messagebox.showerror("Error", "Updater not found")
+                        messagebox.showerror("Error", "Agent executable not found")
                 except Exception as e:
                     messagebox.showerror("Error", f"Update failed: {str(e)}")
             
@@ -207,8 +222,15 @@ class SysWatchTray:
             root = tk.Tk()
             root.withdraw()
             
+            # Get version
+            try:
+                from version import VERSION
+                version = f"v{VERSION}"
+            except ImportError:
+                version = "Unknown"
+            
             messagebox.showinfo("About SysWatch", 
-                f"SysWatch Agent Tray\n\n"
+                f"SysWatch Agent Tray {version}\n\n"
                 f"Server: {self.server_url}\n"
                 f"Remote monitoring system")
             
