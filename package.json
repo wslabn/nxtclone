@@ -1,6 +1,6 @@
 {
   "name": "syswatch",
-  "version": "1.2.57",
+  "version": "1.2.58",
   "description": "SysWatch - Remote monitoring and management system",
   "main": "server/index.js",
   "scripts": {
@@ -18,3 +18,4 @@
     "nodemon": "^3.0.1"
   }
 }
+
