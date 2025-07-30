@@ -160,61 +160,50 @@ class AgentUpdater:
             return False
     
     def update_with_external_updater(self, new_exe, current_exe):
-        """Use external updater to replace executable"""
+        """Use scheduled task with admin privileges for update"""
         try:
-            # Create external updater in temp directory
+            # Ensure temp directory exists
             if not os.path.exists("C:\\temp"):
                 os.makedirs("C:\\temp")
-            updater_script = "C:\\temp\\updater.py"
             
-            # Download updater script if it doesn't exist
-            if not os.path.exists(updater_script):
-                print("Downloading updater script...")
-                updater_url = f"https://github.com/{self.repo_owner}/{self.repo_name}/releases/latest/download/updater.py"
-                try:
-                    response = requests.get(updater_url, timeout=10)
-                    response.raise_for_status()
-                    with open(updater_script, 'w') as f:
-                        f.write(response.text)
-                except:
-                    # Fallback: use embedded updater
-                    self.create_embedded_updater(updater_script)
+            # Create updater script in temp
+            updater_script = "C:\\temp\\updater.py"
+            self.create_embedded_updater(updater_script)
             
             # Update tray app if it exists
             self.update_tray_app_if_exists()
             
-            # Launch external updater
-            print("Launching external updater...")
-            print(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}")
-            
-            # Create log file for updater output
+            # Create log file
             log_file = "C:\\temp\\syswatch_update.log"
             with open(log_file, 'w') as f:
-                f.write(f"Starting update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"Command: {sys.executable} {updater_script} {new_exe} {current_exe}\n")
+                f.write(f"Starting scheduled task update at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"New exe: {new_exe}\n")
+                f.write(f"Current exe: {current_exe}\n")
             
-            # Create a batch script to run updater with service context
-            batch_script = "C:\\temp\\run_update.bat"
-            with open(batch_script, 'w') as f:
-                f.write('@echo off\n')
-                f.write('echo Starting SysWatch Agent Service Update...\n')
-                f.write('timeout /t 3 /nobreak >nul\n')
-                f.write(f'python "{updater_script}" "{new_exe}" "{current_exe}" >> "{log_file}" 2>&1\n')
-                f.write(f'del "{batch_script}" >nul 2>&1\n')
+            # Create/update scheduled task for updates
+            task_name = "SysWatchAgentUpdate"
+            self.create_update_task(task_name, updater_script, new_exe, current_exe)
             
-            print(f"Created update batch script: {batch_script}")
-            print(f"Update log will be: {log_file}")
+            # Trigger the scheduled task
+            print("Triggering scheduled task for update...")
+            result = subprocess.run(['schtasks', '/run', '/tn', task_name], 
+                                  capture_output=True, text=True)
             
-            # Launch batch script and exit immediately
-            subprocess.Popen([batch_script], shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            with open(log_file, 'a') as f:
+                f.write(f"Task trigger result: {result.returncode}\n")
+                if result.stdout: f.write(f"Output: {result.stdout}\n")
+                if result.stderr: f.write(f"Error: {result.stderr}\n")
             
-            print("Update batch script launched, exiting agent...")
-            import time
-            time.sleep(1)
-            os._exit(0)
+            if result.returncode == 0:
+                print("Scheduled task triggered successfully, exiting agent...")
+                time.sleep(2)
+                os._exit(0)
+            else:
+                print(f"Failed to trigger scheduled task: {result.stderr}")
+                return False
             
         except Exception as e:
-            print(f"External updater failed: {e}")
+            print(f"Scheduled task update failed: {e}")
             return False
     
     def create_embedded_updater(self, updater_path):
@@ -566,4 +555,32 @@ if __name__ == "__main__": main()
                 return False
         except Exception as e:
             print(f"Linux service restart failed: {e}")
+            return False
+    
+    def create_update_task(self, task_name, updater_script, new_exe, current_exe):
+        """Create or update scheduled task for agent updates"""
+        try:
+            # Delete existing task if it exists
+            subprocess.run(['schtasks', '/delete', '/tn', task_name, '/f'], 
+                         capture_output=True)
+            
+            # Create new task with SYSTEM privileges
+            cmd = [
+                'schtasks', '/create', '/tn', task_name,
+                '/tr', f'python "{updater_script}" "{new_exe}" "{current_exe}"',
+                '/sc', 'once', '/st', '00:00',
+                '/ru', 'SYSTEM', '/f'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print(f"Created scheduled task: {task_name}")
+                return True
+            else:
+                print(f"Failed to create task: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            print(f"Task creation failed: {e}")
             return False
