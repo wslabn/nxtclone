@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.82" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
+  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.83" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
     
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -60,14 +60,14 @@
                        Type="ownProcess" 
                        Start="auto" 
                        Account="LocalSystem" 
-                       ErrorControl="normal" 
-                       KeyPath="yes" />
+                       ErrorControl="normal" />
         <ServiceControl Id="StartSysWatchService" 
                        Name="SysWatch Agent" 
                        Start="install" 
                        Stop="both" 
                        Remove="uninstall" 
                        Wait="yes" />
+        <RegistryValue Root="HKLM" Key="Software\SysWatch" Name="ServiceInstalled" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </DirectoryRef>
     
