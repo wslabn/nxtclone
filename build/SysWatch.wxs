@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.79" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
+  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.80" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
     
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -57,9 +57,7 @@
                        Type="ownProcess" 
                        Start="auto" 
                        Account="LocalSystem" 
-                       ErrorControl="normal">
-          <ServiceConfig DelayedAutoStart="yes" />
-        </ServiceInstall>
+                       ErrorControl="normal" />
         <ServiceControl Id="StartSysWatchService" 
                        Name="SysWatch Agent" 
                        Start="install" 
@@ -100,9 +98,7 @@
                  Directory="INSTALLFOLDER" 
                  ExeCommand="syswatch-tray.exe" 
                  Execute="commit" 
-                 Return="asyncNoWait">
-      <Condition>INSTALL_TRAY = "1"</Condition>
-    </CustomAction>
+                 Return="asyncNoWait" />
     
     <!-- Installation sequence -->
     <InstallExecuteSequence>
@@ -110,6 +106,8 @@
       <Custom Action="SetServiceParameters" After="ConfigureService">NOT Installed</Custom>
       <Custom Action="StartTrayApp" After="InstallFinalize">NOT Installed AND INSTALL_TRAY = "1"</Custom>
     </InstallExecuteSequence>
+  </Product>
+</Wix>
     
     <!-- UI -->
     <UI>
@@ -121,27 +119,25 @@
       <Publish Dialog="ServerUrlDlg" Control="Next" Event="NewDialog" Value="ProgressDlg">1</Publish>
     </UI>
     
-    <!-- Custom dialog for server URL -->
-    <Fragment>
-      <UI>
-        <Dialog Id="ServerUrlDlg" Width="370" Height="270" Title="SysWatch Agent Configuration">
-          <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Server Configuration" />
-          
-          <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter the server URL to connect to:" />
-          
-          <Control Id="ServerUrlLabel" Type="Text" X="25" Y="60" Width="280" Height="10" NoPrefix="yes" Text="Server URL (e.g., ws://192.168.1.100:3000):" />
-          
-          <Control Id="ServerUrlEdit" Type="Edit" X="25" Y="72" Width="280" Height="18" Property="SERVER_URL" Text="{80}" />
-          
-          <Control Id="TrayCheckBox" Type="CheckBox" X="25" Y="105" Width="280" Height="17" Property="INSTALL_TRAY" CheckBoxValue="1" Text="Install system tray control application (recommended)" />
-          
-          <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
-          <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
-          <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
-            <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
-          </Control>
-        </Dialog>
-      </UI>
-    </Fragment>
-  </Product>
-</Wix>
+<!-- Custom dialog for server URL -->
+<Fragment>
+  <UI>
+    <Dialog Id="ServerUrlDlg" Width="370" Height="270" Title="SysWatch Agent Configuration">
+      <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Server Configuration" />
+      
+      <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter the server URL to connect to:" />
+      
+      <Control Id="ServerUrlLabel" Type="Text" X="25" Y="60" Width="280" Height="10" NoPrefix="yes" Text="Server URL (e.g., ws://192.168.1.100:3000):" />
+      
+      <Control Id="ServerUrlEdit" Type="Edit" X="25" Y="72" Width="280" Height="18" Property="SERVER_URL" Text="{80}" />
+      
+      <Control Id="TrayCheckBox" Type="CheckBox" X="25" Y="105" Width="280" Height="17" Property="INSTALL_TRAY" CheckBoxValue="1" Text="Install system tray control application (recommended)" />
+      
+      <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
+      <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
+      <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+        <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+      </Control>
+    </Dialog>
+  </UI>
+</Fragment>
