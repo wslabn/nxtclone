@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.77" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+    
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    
+    <!-- Properties for custom dialogs -->
+    <Property Id="SERVER_URL" Value="ws://localhost:3000" />
+    <Property Id="INSTALL_TRAY" Value="1" />
+    
+    <!-- Installation directory -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="INSTALLFOLDER" Name="SysWatch" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="SysWatch Agent" />
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+    
+    <!-- Main feature -->
+    <Feature Id="MainFeature" Title="SysWatch Agent" Level="1">
+      <ComponentRef Id="AgentComponent" />
+      <ComponentRef Id="ServiceComponent" />
+    </Feature>
+    
+    <!-- Optional tray feature -->
+    <Feature Id="TrayFeature" Title="System Tray Application" Level="1">
+      <ComponentRef Id="TrayComponent" />
+      <ComponentRef Id="TrayShortcutComponent" />
+    </Feature>
+    
+    <!-- Agent files -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="AgentComponent" Guid="*">
+        <File Id="AgentExe" Source="dist\syswatch-agent-windows.exe" KeyPath="yes" />
+        <File Id="NssmExe" Source="dist\nssm.exe" />
+      </Component>
+      
+      <Component Id="TrayComponent" Guid="*">
+        <File Id="TrayExe" Source="dist\syswatch-tray.exe" KeyPath="yes" />
+        <Condition>INSTALL_TRAY = "1"</Condition>
+      </Component>
+    </DirectoryRef>
+    
+    <!-- Service installation -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="ServiceComponent" Guid="*">
+        <CreateFolder />
+        <ServiceInstall Id="SysWatchService" 
+                       Name="SysWatch Agent" 
+                       DisplayName="SysWatch Agent" 
+                       Description="Remote monitoring and management agent"
+                       Type="ownProcess" 
+                       Start="auto" 
+                       Account="LocalSystem" 
+                       ErrorControl="normal">
+          <ServiceConfig DelayedAutoStart="yes" />
+        </ServiceInstall>
+        <ServiceControl Id="StartSysWatchService" 
+                       Name="SysWatch Agent" 
+                       Start="install" 
+                       Stop="both" 
+                       Remove="uninstall" 
+                       Wait="yes" />
+      </Component>
+    </DirectoryRef>
+    
+    <!-- Desktop shortcut for tray -->
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="TrayShortcutComponent" Guid="*">
+        <Shortcut Id="TrayDesktopShortcut" 
+                 Name="SysWatch Tray" 
+                 Description="SysWatch Agent Control" 
+                 Target="[INSTALLFOLDER]syswatch-tray.exe" 
+                 WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="DesktopFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\SysWatch\Tray" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+        <Condition>INSTALL_TRAY = "1"</Condition>
+      </Component>
+    </DirectoryRef>
+    
+    <!-- Custom actions for service configuration -->
+    <CustomAction Id="ConfigureService" 
+                 Directory="INSTALLFOLDER" 
+                 ExeCommand="nssm.exe set &quot;SysWatch Agent&quot; Application &quot;[INSTALLFOLDER]syswatch-agent-windows.exe&quot;" 
+                 Execute="deferred" 
+                 Impersonate="no" />
+    
+    <CustomAction Id="SetServiceParameters" 
+                 Directory="INSTALLFOLDER" 
+                 ExeCommand="nssm.exe set &quot;SysWatch Agent&quot; Parameters &quot;[SERVER_URL]&quot;" 
+                 Execute="deferred" 
+                 Impersonate="no" />
+    
+    <CustomAction Id="StartTrayApp" 
+                 Directory="INSTALLFOLDER" 
+                 ExeCommand="syswatch-tray.exe" 
+                 Execute="commit" 
+                 Return="asyncNoWait">
+      <Condition>INSTALL_TRAY = "1"</Condition>
+    </CustomAction>
+    
+    <!-- Installation sequence -->
+    <InstallExecuteSequence>
+      <Custom Action="ConfigureService" After="InstallServices">NOT Installed</Custom>
+      <Custom Action="SetServiceParameters" After="ConfigureService">NOT Installed</Custom>
+      <Custom Action="StartTrayApp" After="InstallFinalize">NOT Installed AND INSTALL_TRAY = "1"</Custom>
+    </InstallExecuteSequence>
+    
+    <!-- UI -->
+    <UI>
+      <UIRef Id="WixUI_Minimal" />
+      <DialogRef Id="ServerUrlDlg" />
+      
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ServerUrlDlg">1</Publish>
+      <Publish Dialog="ServerUrlDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+      <Publish Dialog="ServerUrlDlg" Control="Next" Event="NewDialog" Value="ProgressDlg">1</Publish>
+    </UI>
+    
+    <!-- Custom dialog for server URL -->
+    <Fragment>
+      <UI>
+        <Dialog Id="ServerUrlDlg" Width="370" Height="270" Title="SysWatch Agent Configuration">
+          <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Server Configuration" />
+          
+          <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter the server URL to connect to:" />
+          
+          <Control Id="ServerUrlLabel" Type="Text" X="25" Y="60" Width="280" Height="10" NoPrefix="yes" Text="Server URL (e.g., ws://192.168.1.100:3000):" />
+          
+          <Control Id="ServerUrlEdit" Type="Edit" X="25" Y="72" Width="280" Height="18" Property="SERVER_URL" Text="{80}" />
+          
+          <Control Id="TrayCheckBox" Type="CheckBox" X="25" Y="105" Width="280" Height="17" Property="INSTALL_TRAY" CheckBoxValue="1" Text="Install system tray control application (recommended)" />
+          
+          <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
+          <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
+          <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+            <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+          </Control>
+        </Dialog>
+      </UI>
+    </Fragment>
+  </Product>
+</Wix>

@@ -39,13 +39,18 @@ Server runs on http://localhost:3000
 
 **Windows:**
 ```cmd
-# Download and run installer
-https://github.com/wslabn/nxtclone/releases/latest/download/syswatch-agent-installer.exe
+# Download and run MSI installer
+https://github.com/wslabn/nxtclone/releases/latest/download/SysWatch-Agent-Installer.msi
 ```
-1. Run as administrator
+1. Double-click MSI installer (no admin required)
 2. Enter server URL (e.g., `ws://192.168.1.100:3000`)
 3. Choose whether to install system tray control app
-4. Agent installs as Windows service and starts automatically
+4. Agent installs to `C:\ProgramData\SysWatch` and starts automatically
+
+**Silent Install:**
+```cmd
+msiexec /i SysWatch-Agent-Installer.msi /quiet SERVER_URL="ws://192.168.1.100:3000" INSTALL_TRAY=1
+```
 
 **Linux:**
 ```bash
@@ -53,11 +58,12 @@ https://github.com/wslabn/nxtclone/releases/latest/download/syswatch-agent-insta
 wget https://github.com/wslabn/nxtclone/releases/latest/download/syswatch-agent-installer-linux
 chmod +x syswatch-agent-installer-linux
 
-# Install with your server URL
-sudo ./syswatch-agent-installer-linux ws://192.168.1.100:3000
+# Install with your server URL (no root required)
+./syswatch-agent-installer-linux ws://192.168.1.100:3000
 ```
 1. Choose whether to install control application
-2. Agent installs as systemd service and starts automatically
+2. Agent installs to `~/.local/share/SysWatch` as user systemd service
+3. Service starts automatically and runs on boot
 
 **Manual Execution (Development):**
 ```bash
@@ -84,16 +90,17 @@ python3 linux_agent.py ws://your-server:3000
 ## Control Applications
 
 **Windows Tray App:**
-- Optional installation during agent setup
+- Optional installation during MSI setup
 - System tray icon with right-click menu
 - Change server URL, restart service, view logs
 - Desktop shortcut created if installed
+- Config stored in `%APPDATA%\SysWatch\`
 
 **Linux Control App:**
 - Optional installation during agent setup
-- Available system-wide as `syswatch-control`
+- Available as `~/.local/bin/syswatch-control`
 - GUI (if available) or CLI interface
-- Manage service, view logs, change configuration
+- Manage user systemd service, view logs, change configuration
 
 ## Architecture
 
@@ -101,8 +108,9 @@ python3 linux_agent.py ws://your-server:3000
 - **Agents**: Python asyncio-based clients with heartbeat and system monitoring
 - **Database**: SQLite for storing machine info, system data, and command history
 - **Communication**: WebSocket for real-time bidirectional messaging
-- **Auto-Update**: GitHub API integration for automatic updates
+- **Auto-Update**: MSI-based updates for Windows, direct file replacement for Linux
 - **System Monitoring**: psutil-based comprehensive system metrics collection
+- **Installation**: MSI installer for Windows, user-mode installation for Linux
 
 ## System Information Collected
 
@@ -131,9 +139,10 @@ python3 linux_agent.py ws://your-server:3000
 
 - **Automatic Detection**: Agents check GitHub releases every 2 hours
 - **Manual Updates**: "Update All Agents" button for immediate updates
-- **Zero-Touch Updates**: Agents update automatically without intervention
+- **Zero-Touch Updates**: Agents update automatically without admin privileges
 - **Real-time Progress**: Dashboard shows update status and progress
-- **Service Integration**: Windows services and Linux systemd units restart automatically
+- **Windows Updates**: MSI-based updates with Windows Installer service
+- **Linux Updates**: Direct file replacement in user directories
 - **Version Management**: Synchronized versioning across all components
 - **Control App Updates**: Tray and control apps update automatically with agent
 - **Enterprise Ready**: GitHub Actions for automated release management
@@ -152,6 +161,7 @@ Configure Discord webhook in admin panel for alerts:
 ```bash
 cd build
 build-all.bat
+build-msi.bat
 ```
 
 **Linux:**
@@ -164,7 +174,22 @@ chmod +x build-all.sh
 **Requirements:**
 - Python 3.9+
 - PyInstaller
-- NSIS (Windows installer creation)
+- WiX Toolset v3.11+ (Windows MSI creation)
+- NSIS (legacy Windows installer)
+
+## Installation Locations
+
+**Windows:**
+- **Agent**: `C:\ProgramData\SysWatch\`
+- **Tray Config**: `%APPDATA%\SysWatch\`
+- **Service**: Windows Service (LocalSystem)
+- **Updates**: MSI-based with Windows Installer
+
+**Linux:**
+- **Agent**: `~/.local/share/SysWatch/`
+- **Config**: `~/.config/SysWatch/`
+- **Service**: User systemd service
+- **Control**: `~/.local/bin/syswatch-control`
 
 ## Security Notes
 
@@ -185,6 +210,14 @@ Create releases via GitHub Actions:
 3. Enter version (e.g., "1.2.11")
 4. Automatically builds executables and creates release
 
+## Migration from Old Versions
+
+**Clean Installation Recommended:**
+1. Run `cleanup-all-versions.bat` (Windows) to remove old installations
+2. Install new MSI version
+3. Old versions in Program Files/LOCALAPPDATA will be removed
+4. New version installs to ProgramData with proper permissions
+
 ## Troubleshooting
 
 For common issues and solutions, see the [Troubleshooting Guide](TROUBLESHOOTING.md).
@@ -194,6 +227,7 @@ For common issues and solutions, see the [Troubleshooting Guide](TROUBLESHOOTING
 - Auto-update failing: Verify GitHub connectivity and agent version
 - Dashboard issues: Clear browser cache, check authentication
 - Command execution problems: Verify agent permissions and syntax
+- Permission issues: Use MSI installer, avoid manual file copying
 
 ## Contributing
 
@@ -220,6 +254,8 @@ MIT License - see LICENSE file for details
 - **Discord Integration**: Real-time notifications and alerts
 
 ## Project Stats
-- Total Code Files: 15
+- Total Code Files: 18
 - Last Updated: 2025-01-25
-- Current Version: 1.2.15
+- Current Version: 1.2.76
+- Installation: MSI-based (Windows), User-mode (Linux)
+- Auto-Updates: Permission-free updates
