@@ -572,6 +572,43 @@
                 'topio': {
                     'Windows': 'powershell "Get-Counter \\"\\Process(*)\\IO Data Bytes/sec\\" | Select-Object -ExpandProperty CounterSamples | Sort-Object CookedValue -Descending | Select-Object -First 10 InstanceName, @{Name=\\"IO(KB/s)\\";Expression={[math]::Round($_.CookedValue/1KB,1)}} | Format-Table -AutoSize"',
                     'Linux': 'iotop -b -n1 -o | head -10'
+                },
+                // System Fixes
+                'sfc': {
+                    'Windows': 'sfc /scannow',
+                    'Linux': 'echo "System File Checker not available on Linux"'
+                },
+                'dism': {
+                    'Windows': 'dism /online /cleanup-image /restorehealth',
+                    'Linux': 'echo "DISM not available on Linux"'
+                },
+                'chkdsk': {
+                    'Windows': 'echo "CHKDSK requires reboot. Use: chkdsk C: /f /r"',
+                    'Linux': 'sudo fsck -f /dev/sda1'
+                },
+                'flushdns': {
+                    'Windows': 'ipconfig /flushdns',
+                    'Linux': 'sudo systemctl restart systemd-resolved'
+                },
+                'resetnetwork': {
+                    'Windows': 'netsh winsock reset && netsh int ip reset',
+                    'Linux': 'sudo systemctl restart NetworkManager'
+                },
+                'cleantmp': {
+                    'Windows': 'powershell "Get-ChildItem -Path $env:TEMP -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue; Get-ChildItem -Path C:\\Windows\\Temp -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue"',
+                    'Linux': 'sudo rm -rf /tmp/* /var/tmp/*'
+                },
+                'updatepkgs': {
+                    'Windows': 'echo "Use Windows Update or winget upgrade --all"',
+                    'Linux': 'sudo apt update && sudo apt upgrade -y'
+                },
+                'cleanlogs': {
+                    'Windows': 'powershell "wevtutil cl Application; wevtutil cl System; wevtutil cl Security"',
+                    'Linux': 'sudo journalctl --vacuum-time=7d'
+                },
+                'diskcleanup': {
+                    'Windows': 'cleanmgr /sagerun:1',
+                    'Linux': 'sudo apt autoremove -y && sudo apt autoclean'
                 }
             };
             

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.81" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
+  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.82" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
     
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -24,6 +24,7 @@
     <!-- Main feature -->
     <Feature Id="MainFeature" Title="SysWatch Agent" Level="1">
       <ComponentRef Id="AgentComponent" />
+      <ComponentRef Id="NssmComponent" />
       <ComponentRef Id="ServiceComponent" />
     </Feature>
     
@@ -35,12 +36,15 @@
     
     <!-- Agent files -->
     <DirectoryRef Id="INSTALLFOLDER">
-      <Component Id="AgentComponent" Guid="*">
+      <Component Id="AgentComponent" Guid="{12345678-1234-1234-1234-123456789013}">
         <File Id="AgentExe" Source="dist\syswatch-agent-windows.exe" KeyPath="yes" />
-        <File Id="NssmExe" Source="dist\nssm.exe" />
       </Component>
       
-      <Component Id="TrayComponent" Guid="*">
+      <Component Id="NssmComponent" Guid="{12345678-1234-1234-1234-123456789014}">
+        <File Id="NssmExe" Source="dist\nssm.exe" KeyPath="yes" />
+      </Component>
+      
+      <Component Id="TrayComponent" Guid="{12345678-1234-1234-1234-123456789015}">
         <File Id="TrayExe" Source="dist\syswatch-tray.exe" KeyPath="yes" />
         <Condition>INSTALL_TRAY = "1"</Condition>
       </Component>
@@ -48,8 +52,7 @@
     
     <!-- Service installation -->
     <DirectoryRef Id="INSTALLFOLDER">
-      <Component Id="ServiceComponent" Guid="*">
-        <CreateFolder />
+      <Component Id="ServiceComponent" Guid="{12345678-1234-1234-1234-123456789016}">
         <ServiceInstall Id="SysWatchService" 
                        Name="SysWatch Agent" 
                        DisplayName="SysWatch Agent" 
@@ -57,7 +60,8 @@
                        Type="ownProcess" 
                        Start="auto" 
                        Account="LocalSystem" 
-                       ErrorControl="normal" />
+                       ErrorControl="normal" 
+                       KeyPath="yes" />
         <ServiceControl Id="StartSysWatchService" 
                        Name="SysWatch Agent" 
                        Start="install" 
@@ -69,7 +73,7 @@
     
     <!-- Desktop shortcut for tray -->
     <DirectoryRef Id="DesktopFolder">
-      <Component Id="TrayShortcutComponent" Guid="*">
+      <Component Id="TrayShortcutComponent" Guid="{12345678-1234-1234-1234-123456789017}">
         <Shortcut Id="TrayDesktopShortcut" 
                  Name="SysWatch Tray" 
                  Description="SysWatch Agent Control" 

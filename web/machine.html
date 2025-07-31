@@ -396,6 +396,30 @@
                         </div>
                     </div>
                     
+                    <!-- Quick Fixes -->
+                    <div class="dropdown" style="position: relative; margin-right: 0.5rem;">
+                        <button class="btn btn-primary btn-sm dropdown-toggle" ${disabled ? 'disabled' : ''} onclick="toggleDropdown('fixes-dropdown')">
+                            Quick Fixes ▼
+                        </button>
+                        <div id="fixes-dropdown" class="dropdown-menu" style="display: none;">
+                            ${isWindows ? `
+                                <button onclick="quickAction('sfc'); closeDropdowns()" class="dropdown-item">System File Check</button>
+                                <button onclick="quickAction('dism'); closeDropdowns()" class="dropdown-item">DISM Repair</button>
+                                <button onclick="quickAction('flushdns'); closeDropdowns()" class="dropdown-item">Flush DNS</button>
+                                <button onclick="quickAction('resetnetwork'); closeDropdowns()" class="dropdown-item">Reset Network</button>
+                                <button onclick="quickAction('diskcleanup'); closeDropdowns()" class="dropdown-item">Disk Cleanup</button>
+                            ` : `
+                                <button onclick="quickAction('updatepkgs'); closeDropdowns()" class="dropdown-item">Update Packages</button>
+                                <button onclick="quickAction('chkdsk'); closeDropdowns()" class="dropdown-item">Filesystem Check</button>
+                                <button onclick="quickAction('flushdns'); closeDropdowns()" class="dropdown-item">Restart DNS</button>
+                                <button onclick="quickAction('resetnetwork'); closeDropdowns()" class="dropdown-item">Restart Network</button>
+                                <button onclick="quickAction('diskcleanup'); closeDropdowns()" class="dropdown-item">Clean Packages</button>
+                            `}
+                            <button onclick="quickAction('cleantmp'); closeDropdowns()" class="dropdown-item">Clear Temp Files</button>
+                            <button onclick="quickAction('cleanlogs'); closeDropdowns()" class="dropdown-item">Clean Logs</button>
+                        </div>
+                    </div>
+                    
                     <!-- Maintenance Actions -->
                     <div class="dropdown" style="position: relative;">
                         <button class="btn btn-warning btn-sm dropdown-toggle" onclick="toggleDropdown('maintenance-dropdown')">
@@ -660,6 +684,43 @@
                 'topio': {
                     'Windows': 'powershell "Get-Counter \"\\Process(*)\\IO Data Bytes/sec\" | Select-Object -ExpandProperty CounterSamples | Sort-Object CookedValue -Descending | Select-Object -First 10 InstanceName, @{Name=\"IO(KB/s)\";Expression={[math]::Round($_.CookedValue/1KB,1)}} | Format-Table -AutoSize"',
                     'Linux': 'iotop -b -n1 -o | head -10'
+                },
+                // System Fixes
+                'sfc': {
+                    'Windows': 'sfc /scannow',
+                    'Linux': 'echo "System File Checker not available on Linux"'
+                },
+                'dism': {
+                    'Windows': 'dism /online /cleanup-image /restorehealth',
+                    'Linux': 'echo "DISM not available on Linux"'
+                },
+                'chkdsk': {
+                    'Windows': 'echo "CHKDSK requires reboot. Use: chkdsk C: /f /r"',
+                    'Linux': 'sudo fsck -f /dev/sda1'
+                },
+                'flushdns': {
+                    'Windows': 'ipconfig /flushdns',
+                    'Linux': 'sudo systemctl restart systemd-resolved'
+                },
+                'resetnetwork': {
+                    'Windows': 'netsh winsock reset && netsh int ip reset',
+                    'Linux': 'sudo systemctl restart NetworkManager'
+                },
+                'cleantmp': {
+                    'Windows': 'powershell "Get-ChildItem -Path $env:TEMP -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue; Get-ChildItem -Path C:\\Windows\\Temp -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue"',
+                    'Linux': 'sudo rm -rf /tmp/* /var/tmp/*'
+                },
+                'updatepkgs': {
+                    'Windows': 'echo "Use Windows Update or winget upgrade --all"',
+                    'Linux': 'sudo apt update && sudo apt upgrade -y'
+                },
+                'cleanlogs': {
+                    'Windows': 'powershell "wevtutil cl Application; wevtutil cl System; wevtutil cl Security"',
+                    'Linux': 'sudo journalctl --vacuum-time=7d'
+                },
+                'diskcleanup': {
+                    'Windows': 'cleanmgr /sagerun:1',
+                    'Linux': 'sudo apt autoremove -y && sudo apt autoclean'
                 },
                 'systemdetails': {
                     'Windows': 'wmic computersystem get model,manufacturer && wmic cpu get name && wmic bios get smbiosbiosversion && wmic memorychip get memorytype,speed',
