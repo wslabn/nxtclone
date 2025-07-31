@@ -54,11 +54,24 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install pyinstaller psutil websockets requests pystray pillow
     
+    - name: Install WiX Toolset
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install wixtoolset --version=3.11.2 -y
+        echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $GITHUB_PATH
+    
     - name: Build Windows executables
       if: matrix.os == 'windows-latest'
       run: |
         cd build
         python build-windows.py
+    
+    - name: Build MSI Installer
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd build
+        build-msi.bat
+      shell: cmd
     
     - name: Build Linux executables
       if: matrix.os == 'ubuntu-latest'
@@ -128,8 +141,8 @@ jobs:
           - System tray control applications
           
           ### Quick Installation
-          **Windows:** Download and run `syswatch-agent-installer.exe` as administrator
-          **Linux:** Download and run `sudo ./syswatch-agent-installer-linux ws://your-server:3000`
+          **Windows:** Download and run `SysWatch-Agent-Installer.msi` (recommended) or `syswatch-agent-installer.exe`
+          **Linux:** Download and run `./syswatch-agent-installer-linux ws://your-server:3000` (no root required)
           
           ### Optional Control Apps
           **Windows:** Run `syswatch-tray.exe` for system tray control
