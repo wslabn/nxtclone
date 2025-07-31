@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.84" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
+  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.85" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
     
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -14,9 +14,6 @@
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="CommonAppDataFolder">
         <Directory Id="INSTALLFOLDER" Name="SysWatch" />
-      </Directory>
-      <Directory Id="ProgramMenuFolder">
-        <Directory Id="ApplicationProgramsFolder" Name="SysWatch Agent" />
       </Directory>
       <Directory Id="DesktopFolder" Name="Desktop" />
     </Directory>
@@ -101,14 +98,15 @@
     <CustomAction Id="StartTrayApp" 
                  Directory="INSTALLFOLDER" 
                  ExeCommand="syswatch-tray.exe" 
-                 Execute="commit" 
-                 Return="asyncNoWait" />
+                 Execute="deferred" 
+                 Return="asyncNoWait" 
+                 Impersonate="yes" />
     
     <!-- Installation sequence -->
     <InstallExecuteSequence>
       <Custom Action="ConfigureService" After="InstallServices">NOT Installed</Custom>
       <Custom Action="SetServiceParameters" After="ConfigureService">NOT Installed</Custom>
-      <Custom Action="StartTrayApp" After="InstallFinalize">NOT Installed AND INSTALL_TRAY = "1"</Custom>
+      <Custom Action="StartTrayApp" After="InstallFiles">NOT Installed AND INSTALL_TRAY = "1"</Custom>
     </InstallExecuteSequence>
     
     <!-- UI -->
