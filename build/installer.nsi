@@ -130,7 +130,7 @@ Section "install"
     ExecWait 'powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force; Install-Module PSWindowsUpdate -Force -Scope AllUsers"' $3
     
     # Install service using NSSM
-    ExecWait '"$INSTDIR\nssm.exe" install "${APPNAME}" "$INSTDIR\syswatch-agent-windows.exe" $ServerUrl' $0
+    ExecWait '"$INSTDIR\nssm.exe" install "${APPNAME}" "$INSTDIR\syswatch-agent-windows.exe" "$ServerUrl"' $0
     ExecWait '"$INSTDIR\nssm.exe" set "${APPNAME}" Start SERVICE_AUTO_START' $1
     ExecWait '"$INSTDIR\nssm.exe" start "${APPNAME}"' $2
     
