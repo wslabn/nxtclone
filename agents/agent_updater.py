@@ -545,19 +545,28 @@ if __name__ == "__main__": main()
             return False
     
     def restart_linux_service(self):
-        """Restart Linux user service with retry logic"""
+        """Restart Linux service with retry logic (user or system)"""
         try:
-            result = subprocess.run(['systemctl', '--user', 'restart', 'syswatch-agent'], 
-                                  capture_output=True, text=True, timeout=30)
+            # Detect installation type
+            if os.path.exists('/opt/syswatch'):
+                # System installation
+                result = subprocess.run(['sudo', 'systemctl', 'restart', 'syswatch-agent'], 
+                                      capture_output=True, text=True, timeout=30)
+                service_type = "system"
+            else:
+                # User installation
+                result = subprocess.run(['systemctl', '--user', 'restart', 'syswatch-agent'], 
+                                      capture_output=True, text=True, timeout=30)
+                service_type = "user"
             
             if result.returncode == 0:
-                print("Linux user service restarted successfully")
+                print(f"Linux {service_type} service restarted successfully")
                 return True
             else:
-                print(f"Linux user service restart failed: {result.stderr}")
+                print(f"Linux {service_type} service restart failed: {result.stderr}")
                 return False
         except Exception as e:
-            print(f"Linux user service restart failed: {e}")
+            print(f"Linux service restart failed: {e}")
             return False
     
     def create_update_task(self, task_name, updater_script, new_exe, current_exe):

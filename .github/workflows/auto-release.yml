@@ -80,6 +80,15 @@ jobs:
         python build-linux.py
         chmod +x create-linux-installer.sh
         ./create-linux-installer.sh
+        
+        # Build system service installer
+        chmod +x nxtclone-agent-installer-linux-system.sh
+        cp nxtclone-agent-installer-linux-system.sh dist/syswatch-agent-installer-linux-system
+        
+        # Build system-aware tray app
+        cd ../agents
+        pyinstaller --onefile --name=syswatch-control-system linux_tray_system.py
+        cp dist/syswatch-control-system ../build/dist/
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
