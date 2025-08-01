@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.87" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
+  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.88" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
     
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -82,18 +82,7 @@
       </Component>
     </DirectoryRef>
     
-    <!-- Custom actions for service configuration -->
-    <CustomAction Id="ConfigureService" 
-                 Directory="INSTALLFOLDER" 
-                 ExeCommand="nssm.exe set &quot;SysWatch Agent&quot; Application &quot;[INSTALLFOLDER]syswatch-agent-windows.exe&quot;" 
-                 Execute="deferred" 
-                 Impersonate="no" />
-    
-    <CustomAction Id="SetServiceParameters" 
-                 Directory="INSTALLFOLDER" 
-                 ExeCommand="nssm.exe set &quot;SysWatch Agent&quot; Parameters &quot;[SERVER_URL]&quot;" 
-                 Execute="deferred" 
-                 Impersonate="no" />
+    <!-- Custom actions -->
     
     <CustomAction Id="StartTrayApp" 
                  Directory="INSTALLFOLDER" 
@@ -104,8 +93,6 @@
     
     <!-- Installation sequence -->
     <InstallExecuteSequence>
-      <Custom Action="ConfigureService" After="InstallServices">NOT Installed</Custom>
-      <Custom Action="SetServiceParameters" After="ConfigureService">NOT Installed</Custom>
       <Custom Action="StartTrayApp" After="InstallFiles">NOT Installed AND INSTALL_TRAY = "1"</Custom>
     </InstallExecuteSequence>
     
