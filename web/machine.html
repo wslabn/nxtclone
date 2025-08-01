@@ -707,7 +707,7 @@
                     'Linux': 'sudo systemctl restart NetworkManager'
                 },
                 'cleantmp': {
-                    'Windows': 'powershell "Get-ChildItem -Path $env:TEMP -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue; Write-Output \"User temp files cleaned: $env:TEMP\""',
+                    'Windows': 'powershell "Get-ChildItem -Path $env:TEMP -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue; Write-Output \\"User temp files cleaned: $env:TEMP\\""',
                     'Linux': 'sudo rm -rf /tmp/* /var/tmp/*'
                 },
                 'updatepkgs': {

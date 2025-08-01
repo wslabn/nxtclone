@@ -136,7 +136,19 @@ jobs:
     - name: Organize artifacts
       run: |
         mkdir -p final-releases
-        find releases/ -name "*" -type f -exec cp {} final-releases/ \;
+        
+        # Windows files - only MSI and legacy installer
+        find releases/ -name "SysWatch-Agent-Installer.msi" -exec cp {} final-releases/ \;
+        find releases/ -name "syswatch-agent-installer.exe" -exec cp {} final-releases/ \;
+        find releases/ -name "syswatch-tray.exe" -exec cp {} final-releases/ \;
+        
+        # Linux files - only installers and control apps
+        find releases/ -name "syswatch-agent-installer-linux" -exec cp {} final-releases/ \;
+        find releases/ -name "syswatch-agent-installer-linux-system" -exec cp {} final-releases/ \;
+        find releases/ -name "syswatch-control" -exec cp {} final-releases/ \;
+        find releases/ -name "syswatch-control-system" -exec cp {} final-releases/ \;
+        
+        # Server updater
         cp agents/updater.py final-releases/
     
     - name: Create Release
@@ -156,12 +168,14 @@ jobs:
           - System tray control applications
           
           ### Quick Installation
-          **Windows:** Download and run `SysWatch-Agent-Installer.msi` (recommended) or `syswatch-agent-installer.exe`
-          **Linux:** Download and run `./syswatch-agent-installer-linux ws://your-server:3000` (no root required)
+          **Windows:** Download and run `SysWatch-Agent-Installer.msi` (recommended MSI installer)
+          **Linux User Mode:** Download and run `./syswatch-agent-installer-linux ws://your-server:3000` (no root required)
+          **Linux System Mode:** Download and run `sudo ./syswatch-agent-installer-linux-system ws://your-server:3000` (runs for all users)
           
-          ### Optional Control Apps
-          **Windows:** Run `syswatch-tray.exe` for system tray control
-          **Linux:** Run `./syswatch-control` for GUI/CLI management
+          ### Control Applications
+          **Windows:** `syswatch-tray.exe` - System tray control (optional during MSI install)
+          **Linux User:** `syswatch-control` - GUI/CLI management for user installations
+          **Linux System:** `syswatch-control-system` - GUI/CLI management for system installations
           
           ### Auto-Update
           Agents automatically check for and install updates from this release.
