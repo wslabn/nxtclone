@@ -135,9 +135,28 @@ class Database {
         }
       });
       
-      // Clean up old metrics (keep only 7 days)
+      // Event logs table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS event_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          machine_id TEXT,
+          log_type TEXT,
+          event_time TEXT,
+          source TEXT,
+          event_id INTEGER,
+          event_type TEXT,
+          description TEXT,
+          timestamp INTEGER,
+          FOREIGN KEY (machine_id) REFERENCES machines (id) ON DELETE CASCADE
+        )
+      `);
+      
+      this.db.run(`CREATE INDEX IF NOT EXISTS idx_event_logs_machine_time ON event_logs (machine_id, timestamp)`);
+      
+      // Clean up old data (keep only 7 days)
       this.db.run(`DELETE FROM metrics WHERE timestamp < ?`, [Date.now() - (7 * 24 * 60 * 60 * 1000)]);
       this.db.run(`DELETE FROM alerts WHERE timestamp < ?`, [Date.now() - (7 * 24 * 60 * 60 * 1000)]);
+      this.db.run(`DELETE FROM event_logs WHERE timestamp < ?`, [Date.now() - (7 * 24 * 60 * 60 * 1000)]);
     });
   }
 
@@ -436,6 +455,46 @@ class Database {
         }
       );
       stmt.finalize();
+    });
+  }
+  
+  // Event Logs
+  storeEventLogs(machineId, eventLogs) {
+    if (!eventLogs || eventLogs.length === 0) return;
+    
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO event_logs 
+      (machine_id, log_type, event_time, source, event_id, event_type, description, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    eventLogs.forEach(log => {
+      stmt.run(
+        machineId,
+        log.log,
+        log.time,
+        log.source,
+        log.eventId,
+        log.type,
+        log.description,
+        Date.now()
+      );
+    });
+    
+    stmt.finalize();
+  }
+  
+  getEventLogs(machineId, limit = 50) {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM event_logs 
+        WHERE machine_id = ? 
+        ORDER BY timestamp DESC 
+        LIMIT ?
+      `, [machineId, limit], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
     });
   }
 }

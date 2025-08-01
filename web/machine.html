@@ -515,20 +515,20 @@
         async function loadMetrics() {
             try {
                 const response = await fetch(`/api/metrics/${machineId}`);
-                const metrics = await response.json();
+                const data = await response.json();
                 
-                if (metrics.error) {
-                    console.error('Metrics error:', metrics.error);
+                if (data.error) {
+                    console.error('Metrics error:', data.error);
                     return;
                 }
 
-                renderChart(metrics);
+                renderChart(data.metrics || data, data.eventLogs || []);
             } catch (error) {
                 console.error('Failed to load metrics:', error);
             }
         }
 
-        function renderChart(metrics) {
+        function renderChart(metrics, eventLogs = []) {
             const ctx = document.getElementById('metricsChart').getContext('2d');
             
             if (metricsChart) {
@@ -560,23 +560,55 @@
                     color = '#0891b2';
                     break;
             }
+            
+            // Create event markers dataset
+            const eventMarkers = eventLogs.map(event => {
+                const eventTime = new Date(event.event_time).getTime();
+                const closestMetric = metrics.find(m => Math.abs(m.timestamp - eventTime) < 300000); // 5 min window
+                if (closestMetric) {
+                    return {
+                        x: new Date(closestMetric.timestamp).toLocaleString(),
+                        y: closestMetric[currentMetric === 'cpu' ? 'cpu_percent' : 
+                                      currentMetric === 'memory' ? 'memory_percent' :
+                                      currentMetric === 'disk' ? 'disk_percent' : 'process_count'],
+                        event: event
+                    };
+                }
+                return null;
+            }).filter(Boolean);
+
+            const datasets = [{
+                label: label,
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '20',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: color,
+                pointBorderColor: color,
+                pointRadius: 2
+            }];
+            
+            // Add event markers if any
+            if (eventMarkers.length > 0) {
+                datasets.push({
+                    label: 'Event Logs',
+                    data: eventMarkers.map(m => ({ x: m.x, y: m.y })),
+                    backgroundColor: '#ff0000',
+                    borderColor: '#ff0000',
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    showLine: false,
+                    pointStyle: 'triangle'
+                });
+            }
 
             metricsChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: label,
-                        data: data,
-                        borderColor: color,
-                        backgroundColor: color + '20',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointBackgroundColor: color,
-                        pointBorderColor: color,
-                        pointRadius: 2
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
@@ -593,6 +625,17 @@
                     plugins: {
                         legend: {
                             display: true
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    if (context.datasetIndex === 1 && eventMarkers[context.dataIndex]) {
+                                        const event = eventMarkers[context.dataIndex].event;
+                                        return `Event: ${event.source} (ID: ${event.event_id})\n${event.description.substring(0, 100)}...`;
+                                    }
+                                    return '';
+                                }
+                            }
                         }
                     }
                 }

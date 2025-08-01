@@ -231,8 +231,11 @@ class RMMServer {
       try {
         const { machineId } = req.params;
         const twentyFourHours = 24 * 60 * 60 * 1000;
-        const metrics = await this.db.getMetricsHistory(machineId, twentyFourHours);
-        res.json(metrics);
+        const [metrics, eventLogs] = await Promise.all([
+          this.db.getMetricsHistory(machineId, twentyFourHours),
+          this.db.getEventLogs(machineId, 20)
+        ]);
+        res.json({ metrics, eventLogs });
       } catch (error) {
         res.json({ error: error.message });
       }
@@ -639,6 +642,11 @@ class RMMServer {
             
             // Store metrics in database for historical tracking
             this.db.storeMetrics(client.id, metrics);
+            
+            // Store event logs if present
+            if (message.eventLogs && message.eventLogs.length > 0) {
+              this.db.storeEventLogs(client.id, message.eventLogs);
+            }
             
             // Check for immediate anomalies
             this.checkMetricAnomalies(client.id, client.hostname, metrics);

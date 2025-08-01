@@ -11,6 +11,12 @@ import psutil
 import time
 import logging
 from agent_updater import AgentUpdater
+try:
+    import win32evtlog
+    import win32evtlogutil
+    import win32con
+except ImportError:
+    win32evtlog = None
 
 # Setup logging for service debugging
 logging.basicConfig(
@@ -152,6 +158,10 @@ class WindowsAgent:
                     "hostname": self.hostname,
                     "metrics": system_metrics
                 }
+                
+                # Add event logs if available
+                if win32evtlog:
+                    heartbeat_msg['eventLogs'] = self.get_recent_event_logs()
                 await websocket.send(json.dumps(heartbeat_msg))
                 await asyncio.sleep(15)  # Send heartbeat every 15 seconds
             except Exception as e:
@@ -407,6 +417,69 @@ class WindowsAgent:
             }
         except Exception as e:
             return {"error": str(e)}
+    
+    def get_recent_event_logs(self):
+        """Get recent critical and error events from Windows Event Log"""
+        if not win32evtlog:
+            return []
+        
+        events = []
+        try:
+            # Check System and Application logs
+            for log_type in ['System', 'Application']:
+                try:
+                    hand = win32evtlog.OpenEventLog(None, log_type)
+                    flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+                    
+                    # Read last 5 events per log
+                    event_count = 0
+                    while event_count < 5:
+                        events_batch = win32evtlog.ReadEventLog(hand, flags, 0)
+                        if not events_batch:
+                            break
+                        
+                        for event in events_batch:
+                            if event_count >= 5:
+                                break
+                            
+                            # Only include Error and Warning events
+                            if event.EventType in [win32con.EVENTLOG_ERROR_TYPE, win32con.EVENTLOG_WARNING_TYPE]:
+                                try:
+                                    event_time = event.TimeGenerated.Format()
+                                    source = event.SourceName
+                                    event_id = event.EventID
+                                    
+                                    # Get event description
+                                    try:
+                                        description = win32evtlogutil.SafeFormatMessage(event, log_type)
+                                        if len(description) > 300:
+                                            description = description[:300] + "..."
+                                    except:
+                                        description = "Unable to format message"
+                                    
+                                    events.append({
+                                        'log': log_type,
+                                        'time': event_time,
+                                        'source': source,
+                                        'eventId': event_id,
+                                        'type': 'Error' if event.EventType == win32con.EVENTLOG_ERROR_TYPE else 'Warning',
+                                        'description': description
+                                    })
+                                    
+                                    event_count += 1
+                                except Exception:
+                                    continue
+                        
+                        if len(events_batch) == 0:
+                            break
+                    
+                    win32evtlog.CloseEventLog(hand)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        
+        return events[:10]  # Limit to 10 most recent events
 
 def main():
     """Main function for both service and console execution"""

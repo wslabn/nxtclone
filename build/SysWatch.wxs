@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.88" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
+  <Product Id="*" Name="SysWatch Agent" Language="1033" Version="1.2.89" Manufacturer="SysWatch" UpgradeCode="12345678-1234-1234-1234-123456789012">
     <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
     
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -55,9 +55,10 @@
                        DisplayName="SysWatch Agent" 
                        Description="Remote monitoring and management agent"
                        Type="ownProcess" 
-                       Start="auto" 
+                       Start="demand" 
                        Account="LocalSystem" 
-                       ErrorControl="normal" />
+                       ErrorControl="normal" 
+                       Arguments="[SERVER_URL]" />
         <ServiceControl Id="StartSysWatchService" 
                        Name="SysWatch Agent" 
                        Start="install" 
@@ -83,6 +84,12 @@
     </DirectoryRef>
     
     <!-- Custom actions -->
+    <CustomAction Id="StartService" 
+                 Directory="INSTALLFOLDER" 
+                 ExeCommand="sc start &quot;SysWatch Agent&quot;" 
+                 Execute="deferred" 
+                 Return="ignore" 
+                 Impersonate="no" />
     
     <CustomAction Id="StartTrayApp" 
                  Directory="INSTALLFOLDER" 
@@ -93,17 +100,22 @@
     
     <!-- Installation sequence -->
     <InstallExecuteSequence>
+      <Custom Action="StartService" After="InstallServices">NOT Installed</Custom>
       <Custom Action="StartTrayApp" After="InstallFiles">NOT Installed AND INSTALL_TRAY = "1"</Custom>
     </InstallExecuteSequence>
     
     <!-- UI -->
     <UI>
-      <UIRef Id="WixUI_Minimal" />
+      <UIRef Id="WixUI_Common" />
       <DialogRef Id="ServerUrlDlg" />
       
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ServerUrlDlg">1</Publish>
-      <Publish Dialog="ServerUrlDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
-      <Publish Dialog="ServerUrlDlg" Control="Next" Event="NewDialog" Value="ProgressDlg">1</Publish>
+      <!-- Custom install sequence -->
+      <InstallUISequence>
+        <Show Dialog="ServerUrlDlg" Before="ProgressDlg" />
+      </InstallUISequence>
+      
+      <Publish Dialog="ServerUrlDlg" Control="Next" Event="EndDialog" Value="Return">1</Publish>
+      <Publish Dialog="ServerUrlDlg" Control="Cancel" Event="SpawnDialog" Value="CancelDlg">1</Publish>
     </UI>
   </Product>
   

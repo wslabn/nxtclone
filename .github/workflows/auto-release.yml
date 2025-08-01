@@ -52,7 +52,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install pyinstaller psutil websockets requests pystray pillow
+        python -m pip install pyinstaller psutil websockets requests pystray pillow pywin32
     
     - name: Setup WiX Toolset
       if: matrix.os == 'windows-latest'
@@ -137,9 +137,8 @@ jobs:
       run: |
         mkdir -p final-releases
         
-        # Windows files - only MSI installer and tray app
+        # Windows files - only MSI installer
         find releases/ -name "SysWatch-Agent-Installer.msi" -exec cp {} final-releases/ \;
-        find releases/ -name "syswatch-tray.exe" -exec cp {} final-releases/ \;
         
         # Linux files - only system installer and system control app
         find releases/ -name "syswatch-agent-installer-linux-system" -exec cp {} final-releases/ \;
@@ -169,8 +168,8 @@ jobs:
           **Linux:** Download and run `sudo ./syswatch-agent-installer-linux-system ws://your-server:3000` (system service for all users)
           
           ### Control Applications
-          **Windows:** `syswatch-tray.exe` - System tray control (optional during MSI install)
           **Linux:** `syswatch-control-system` - GUI/CLI management for system installations
+          **Windows:** Service runs automatically, manage via Windows Services console
           
           ### Auto-Update
           Agents automatically check for and install updates from this release.
