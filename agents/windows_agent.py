@@ -219,53 +219,37 @@ class WindowsAgent:
             await websocket.send(json.dumps(response))
             
         elif message["type"] == "update_request":
-            print("Auto-update request received")
+            print("Update request received")
             try:
-                # Send status update
                 await websocket.send(json.dumps({
                     "type": "update_status",
                     "hostname": self.hostname,
                     "status": "checking"
                 }))
                 
-                await websocket.send(json.dumps({
-                    "type": "agent_log",
-                    "hostname": self.hostname,
-                    "message": "Checking for updates..."
-                }))
-                
-                print("Calling updater.check_for_updates()...")
                 update_info = self.updater.check_for_updates()
-                print(f"Update check result: {update_info}")
                 if update_info.get("has_update"):
-                    await websocket.send(json.dumps({
-                        "type": "update_status",
-                        "hostname": self.hostname,
-                        "status": "updating",
-                        "version": update_info['latest_version'],
-                        "currentVersion": update_info['current_version']
-                    }))
-                    
-                    await websocket.send(json.dumps({
-                        "type": "agent_log",
-                        "hostname": self.hostname,
-                        "message": f"Updating from {update_info['current_version']} to {update_info['latest_version']}"
-                    }))
-                    
-                    print(f"Auto-updating: {update_info['current_version']} -> {update_info['latest_version']}")
-                    if self.updater.download_and_update(update_info["download_url"]):
+                    # Download MSI and schedule login prompt
+                    if self.schedule_user_update(update_info):
+                        await websocket.send(json.dumps({
+                            "type": "update_status",
+                            "hostname": self.hostname,
+                            "status": "user_prompted",
+                            "version": update_info['latest_version'],
+                            "currentVersion": update_info['current_version']
+                        }))
+                        
                         await websocket.send(json.dumps({
                             "type": "agent_log",
                             "hostname": self.hostname,
-                            "message": "Update successful, restarting agent..."
+                            "message": f"Update ready - user will be prompted on next login"
                         }))
-                        print("Update successful, restarting...")
-                        self.updater.restart_agent()
                     else:
                         await websocket.send(json.dumps({
-                            "type": "agent_log",
+                            "type": "update_status",
                             "hostname": self.hostname,
-                            "message": "Update download/install failed"
+                            "status": "error",
+                            "error": "Failed to download update"
                         }))
                 else:
                     await websocket.send(json.dumps({
@@ -273,31 +257,14 @@ class WindowsAgent:
                         "hostname": self.hostname,
                         "status": "up_to_date"
                     }))
-                    
-                    await websocket.send(json.dumps({
-                        "type": "agent_log",
-                        "hostname": self.hostname,
-                        "message": "Agent is already up to date"
-                    }))
-                    print("Agent is already up to date")
             except Exception as e:
-                print(f"Update request handler error: {e}")
-                try:
-                    await websocket.send(json.dumps({
-                        "type": "update_status",
-                        "hostname": self.hostname,
-                        "status": "error",
-                        "error": str(e)
-                    }))
-                    
-                    await websocket.send(json.dumps({
-                        "type": "agent_log",
-                        "hostname": self.hostname,
-                        "message": f"Update failed: {str(e)}"
-                    }))
-                except:
-                    pass
-                print(f"Auto-update failed: {e}")
+                await websocket.send(json.dumps({
+                    "type": "update_status",
+                    "hostname": self.hostname,
+                    "status": "error",
+                    "error": str(e)
+                }))
+                print(f"Update request failed: {e}")
                 
         elif message["type"] == "uninstall_request":
             print("Uninstall request received")
@@ -516,3 +483,44 @@ if __name__ == "__main__":
     else:
         # Normal execution
         main()
+    
+    def schedule_user_update(self, update_info):
+        """Download MSI and schedule login prompt"""
+        try:
+            import winreg
+            import urllib.request
+            
+            # Download MSI to temp folder
+            temp_dir = os.environ.get('TEMP', 'C:\\Windows\\Temp')
+            msi_path = os.path.join(temp_dir, f"SysWatch-Update-{update_info['latest_version']}.msi")
+            
+            print(f"Downloading update to {msi_path}")
+            urllib.request.urlretrieve(update_info['download_url'], msi_path)
+            
+            # Create update launcher script
+            launcher_path = os.path.join(temp_dir, "syswatch-update-launcher.bat")
+            with open(launcher_path, 'w') as f:
+                f.write(f'''@echo off
+echo SysWatch Update Available
+echo Version: {update_info['latest_version']}
+echo.
+choice /C YN /M "Install update now"
+if errorlevel 2 goto skip
+msiexec /i "{msi_path}" /qb
+:skip
+del "{launcher_path}"
+''')
+            
+            # Add to registry to run on next login
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, 
+                               r"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 
+                               0, winreg.KEY_SET_VALUE)
+            winreg.SetValueEx(key, "SysWatchUpdate", 0, winreg.REG_SZ, launcher_path)
+            winreg.CloseKey(key)
+            
+            print("Update scheduled for next user login")
+            return True
+            
+        except Exception as e:
+            print(f"Failed to schedule update: {e}")
+            return False
