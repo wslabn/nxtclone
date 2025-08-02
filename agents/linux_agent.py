@@ -164,50 +164,52 @@ class LinuxAgent:
             await websocket.send(json.dumps(response))
             
         elif message["type"] == "update_request":
-            print("Auto-update request received")
+            print("Update request received")
             try:
-                # Send status update
                 await websocket.send(json.dumps({
                     "type": "update_status",
                     "hostname": self.hostname,
                     "status": "checking"
                 }))
                 
-                print("Calling updater.check_for_updates()...")
                 update_info = self.updater.check_for_updates()
-                print(f"Update check result: {update_info}")
                 if update_info.get("has_update"):
-                    await websocket.send(json.dumps({
-                        "type": "update_status",
-                        "hostname": self.hostname,
-                        "status": "updating",
-                        "version": update_info['latest_version'],
-                        "currentVersion": update_info['current_version']
-                    }))
-                    
-                    print(f"Auto-updating: {update_info['current_version']} -> {update_info['latest_version']}")
-                    if self.updater.download_and_update(update_info["download_url"]):
-                        print("Update successful, restarting...")
-                        self.updater.restart_agent()
+                    # Download installer and schedule login prompt
+                    if self.schedule_user_update(update_info):
+                        await websocket.send(json.dumps({
+                            "type": "update_status",
+                            "hostname": self.hostname,
+                            "status": "user_prompted",
+                            "version": update_info['latest_version'],
+                            "currentVersion": update_info['current_version']
+                        }))
+                        
+                        await websocket.send(json.dumps({
+                            "type": "agent_log",
+                            "hostname": self.hostname,
+                            "message": f"Update ready - user will be prompted on next login"
+                        }))
+                    else:
+                        await websocket.send(json.dumps({
+                            "type": "update_status",
+                            "hostname": self.hostname,
+                            "status": "error",
+                            "error": "Failed to download update"
+                        }))
                 else:
                     await websocket.send(json.dumps({
                         "type": "update_status",
                         "hostname": self.hostname,
                         "status": "up_to_date"
                     }))
-                    print("Agent is already up to date")
             except Exception as e:
-                print(f"Update request handler error: {e}")
-                try:
-                    await websocket.send(json.dumps({
-                        "type": "update_status",
-                        "hostname": self.hostname,
-                        "status": "error",
-                        "error": str(e)
-                    }))
-                except:
-                    pass
-                print(f"Auto-update failed: {e}")
+                await websocket.send(json.dumps({
+                    "type": "update_status",
+                    "hostname": self.hostname,
+                    "status": "error",
+                    "error": str(e)
+                }))
+                print(f"Update request failed: {e}")
                 
         elif message["type"] == "uninstall_request":
             print("Uninstall request received")
@@ -339,3 +341,73 @@ if __name__ == "__main__":
     print("Auto-update enabled - agent will update automatically")
     
     asyncio.run(agent.connect())
+    
+    def schedule_user_update(self, update_info):
+        """Download installer and schedule login prompt"""
+        try:
+            import urllib.request
+            
+            # Download installer to temp folder
+            temp_dir = '/tmp'
+            installer_path = os.path.join(temp_dir, f"syswatch-agent-installer-linux-{update_info['latest_version']}")
+            
+            print(f"Downloading update to {installer_path}")
+            urllib.request.urlretrieve(update_info['download_url'], installer_path)
+            os.chmod(installer_path, 0o755)
+            
+            # Create update prompt script
+            prompt_script = os.path.join(temp_dir, "syswatch-update-prompt.sh")
+            with open(prompt_script, 'w') as f:
+                f.write(f'''#!/bin/bash
+echo "SysWatch Update Available"
+echo "Version: {update_info['latest_version']}"
+echo ""
+
+# Try GUI first, fallback to terminal
+if command -v zenity >/dev/null 2>&1; then
+    if zenity --question --title="SysWatch Update" --text="SysWatch update v{update_info['latest_version']} is available.\\n\\nInstall now?"; then
+        gnome-terminal -- bash -c "sudo {installer_path}; read -p 'Press Enter to close...'"
+    fi
+elif command -v kdialog >/dev/null 2>&1; then
+    if kdialog --yesno "SysWatch update v{update_info['latest_version']} is available.\\n\\nInstall now?"; then
+        konsole -e bash -c "sudo {installer_path}; read -p 'Press Enter to close...'"
+    fi
+else
+    # Terminal fallback
+    echo "Install SysWatch update v{update_info['latest_version']} now? (y/N)"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        sudo {installer_path}
+    fi
+fi
+
+# Cleanup
+rm -f ~/.config/autostart/syswatch-update.desktop
+rm -f {prompt_script}
+''')
+            os.chmod(prompt_script, 0o755)
+            
+            # Create autostart directory if it doesn't exist
+            autostart_dir = os.path.expanduser("~/.config/autostart")
+            os.makedirs(autostart_dir, exist_ok=True)
+            
+            # Create desktop entry for autostart
+            desktop_file = os.path.join(autostart_dir, "syswatch-update.desktop")
+            with open(desktop_file, 'w') as f:
+                f.write(f'''[Desktop Entry]
+Type=Application
+Name=SysWatch Update
+Comment=SysWatch Agent Update Prompt
+Exec={prompt_script}
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+StartupNotify=false
+''')
+            
+            print("Update scheduled for next user login")
+            return True
+            
+        except Exception as e:
+            print(f"Failed to schedule update: {e}")
+            return False
