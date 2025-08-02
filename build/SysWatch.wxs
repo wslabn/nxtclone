@@ -59,8 +59,7 @@
                        Start="auto" 
                        Account="LocalSystem" 
                        ErrorControl="normal" 
-                       Arguments="[SERVER_URL]" 
-                       File="ServiceExe" />
+                       Arguments="[SERVER_URL]" />
         <ServiceControl Id="StartSysWatchService" 
                        Name="SysWatch Agent" 
                        Start="install" 
