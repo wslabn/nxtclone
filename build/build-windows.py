@@ -27,16 +27,32 @@ def build_windows_agent():
     except Exception as e:
         print(f"Icon creation failed: {e}")
     
-    # Build the Windows agent executable
+    # Build the Windows service executable
     import sys
     separator = ';' if sys.platform == 'win32' else ':'
     
     PyInstaller.__main__.run([
         '--onefile',
-        '--name=syswatch-agent-windows',
+        '--name=syswatch-service',
         f'--add-data=../agents/version.py{separator}.',
         f'--add-data=../agents/agent_updater.py{separator}.',
         f'--add-data=../agents/windows_agent.py{separator}.',
+        '--hidden-import=win32timezone',
+        '--hidden-import=win32serviceutil',
+        '--hidden-import=win32service',
+        '--hidden-import=win32event',
+        '--hidden-import=servicemanager',
+        '../agents/windows_service.py'
+    ])
+    
+    print("Windows service built successfully!")
+    
+    # Build the Windows agent executable (for standalone use)
+    PyInstaller.__main__.run([
+        '--onefile',
+        '--name=syswatch-agent-windows',
+        f'--add-data=../agents/version.py{separator}.',
+        f'--add-data=../agents/agent_updater.py{separator}.',
         '--hidden-import=win32timezone',
         '../agents/windows_agent.py'
     ])

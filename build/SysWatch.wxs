@@ -34,7 +34,8 @@
     <!-- Agent files -->
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="AgentComponent" Guid="{12345678-1234-1234-1234-123456789013}">
-        <File Id="AgentExe" Source="dist\syswatch-agent-windows.exe" KeyPath="yes" />
+        <File Id="ServiceExe" Source="dist\syswatch-service.exe" KeyPath="yes" />
+        <File Id="AgentExe" Source="dist\syswatch-agent-windows.exe" />
       </Component>
       
       <Component Id="NssmComponent" Guid="{12345678-1234-1234-1234-123456789014}">
@@ -55,10 +56,11 @@
                        DisplayName="SysWatch Agent" 
                        Description="Remote monitoring and management agent"
                        Type="ownProcess" 
-                       Start="demand" 
+                       Start="auto" 
                        Account="LocalSystem" 
                        ErrorControl="normal" 
-                       Arguments="[SERVER_URL]" />
+                       Arguments="[SERVER_URL]" 
+                       File="ServiceExe" />
         <ServiceControl Id="StartSysWatchService" 
                        Name="SysWatch Agent" 
                        Start="install" 
