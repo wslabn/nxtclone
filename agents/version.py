@@ -1,2 +1,2 @@
 # This file is auto-generated during build
-VERSION = "1.2.87"
+VERSION = "1.2.90"
