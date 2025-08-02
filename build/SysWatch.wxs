@@ -104,25 +104,17 @@
       <Custom Action="StartTrayApp" After="InstallFiles">NOT Installed AND INSTALL_TRAY = "1"</Custom>
     </InstallExecuteSequence>
     
-    <!-- UI with proper WiX structure -->
-    <UIRef Id="WixUI_Common" />
+    <!-- Use WixUI_InstallDir as base -->
+    <UIRef Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     
     <UI>
-      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
-      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
-      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
-      
       <DialogRef Id="ServerUrlDlg" />
-      <DialogRef Id="ErrorDlg" />
-      <DialogRef Id="FatalError" />
-      <DialogRef Id="UserExit" />
-      <DialogRef Id="ExitDialog" />
       
-      <InstallUISequence>
-        <Show Dialog="ServerUrlDlg" Before="ProgressDlg" />
-      </InstallUISequence>
-      
-      <Publish Dialog="ServerUrlDlg" Control="Next" Event="EndDialog" Value="Return">1</Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ServerUrlDlg">1</Publish>
+      <Publish Dialog="ServerUrlDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+      <Publish Dialog="ServerUrlDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ServerUrlDlg">1</Publish>
     </UI>
   </Product>
   
@@ -140,10 +132,9 @@
         
         <Control Id="TrayCheckBox" Type="CheckBox" X="25" Y="105" Width="280" Height="17" Property="INSTALL_TRAY" CheckBoxValue="1" Text="Install system tray control application (recommended)" />
         
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
-        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
-          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
-        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel" />
       </Dialog>
     </UI>
   </Fragment>
