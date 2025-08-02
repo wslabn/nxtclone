@@ -35,12 +35,12 @@ class SysWatchService(win32serviceutil.ServiceFramework):
         
         # Get the directory where this service is running
         service_dir = os.path.dirname(os.path.abspath(__file__))
-        agent_path = os.path.join(service_dir, "windows_agent.py")
+        agent_path = os.path.join(service_dir, "syswatch-agent-windows.exe")
         
         # Start the agent process
         try:
             self.process = subprocess.Popen([
-                sys.executable, agent_path, server_url
+                agent_path, server_url
             ], cwd=service_dir)
             
             # Wait for stop signal or process to end
@@ -51,7 +51,7 @@ class SysWatchService(win32serviceutil.ServiceFramework):
                     # Process ended, restart it
                     time.sleep(5)
                     self.process = subprocess.Popen([
-                        sys.executable, agent_path, server_url
+                        agent_path, server_url
                     ], cwd=service_dir)
                     
         except Exception as e:
